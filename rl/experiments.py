@@ -118,15 +118,73 @@ def window_sweep(n_assets=10, windows=(20, 60), timesteps=15_000, test_days=252)
     return df
 
 
+REAL_TICKERS = ["SPY", "QQQ", "IWM", "EFA", "EEM", "AGG", "TLT", "HYG", "GLD", "VNQ"]
+
+
+def seed_sweep(
+    tickers=None, use_dummy=True, start="2019-01-01", end="2024-12-31",
+    window=WINDOW_SIZE, timesteps=120_000, test_days=252,
+    reward_types=("simple", "sharpe", "mdd_penalty"), seeds=(0, 1, 2),
+):
+    """동일 설정을 시드만 바꿔 반복 실행 -> "학습을 더 시키는 것"과 "시드
+    변동성"을 구분하기 위한 실험.
+
+    보고 포인트: reward_type별로 시드 간 표준편차가 평균 차이보다 크면,
+    스텝을 더 늘리는 것보다 시드를 여러 개 돌려 평균을 보는 게 우선이라는
+    근거가 된다.
+    """
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    tickers = tickers or [f"A{i}" for i in range(10)]
+    _, returns, rsi_df, macd_df = prepare_env_inputs(tickers, start=start, end=end, use_dummy=use_dummy, verbose=False)
+    train_data, test_data = _split(returns, rsi_df, macd_df, window, test_days)
+
+    rows = []
+    for rt in reward_types:
+        reward_kwargs = {"mdd_lambda": 1.0} if rt == "mdd_penalty" else {}
+        for seed in seeds:
+            print(f"[seed_sweep] reward={rt} seed={seed} 학습 중...")
+            metrics = _train_and_eval(train_data, test_data, window, rt, reward_kwargs, timesteps, seed=seed)
+            rows.append({"reward_type": rt, "seed": seed, **metrics})
+            print(f"[seed_sweep] reward={rt} seed={seed} -> return={metrics['cumulative_return']:.4f}, sharpe={metrics['sharpe']:.3f}, mdd={metrics['mdd']:.4f}")
+
+    df = pd.DataFrame(rows)
+    df.to_csv(OUT_DIR / "seed_sweep.csv", index=False)
+
+    summary = df.groupby("reward_type")[["cumulative_return", "sharpe", "mdd"]].agg(["mean", "std"])
+    summary.to_csv(OUT_DIR / "seed_sweep_summary.csv")
+    print("\n[seed_sweep] 요약 (평균 ± 표준편차):")
+    print(summary)
+
+    from .stats_tests import one_way_anova
+    groups = {rt: df.loc[df.reward_type == rt, "cumulative_return"] for rt in reward_types}
+    anova = one_way_anova(groups)
+    print(f"[seed_sweep] ANOVA(시드별 누적수익률, reward_type 간): F={anova['f_stat']:.3f}, p={anova['p_value']:.4f}, eta^2={anova['eta_squared']:.4f}")
+
+    print(f"[seed_sweep] saved -> {OUT_DIR / 'seed_sweep.csv'}, {OUT_DIR / 'seed_sweep_summary.csv'}")
+    return df, summary
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--which", choices=["lambda", "window", "both"], default="both")
+    parser.add_argument("--which", choices=["lambda", "window", "seed", "both"], default="both")
     parser.add_argument("--timesteps", type=int, default=15_000)
+    parser.add_argument("--seeds", type=str, default="0,1,2")
+    parser.add_argument("--real", action="store_true", help="더미 대신 이미 받아둔 실제 ETF 10종 데이터 사용")
     args = parser.parse_args()
 
     if args.which in ("lambda", "both"):
         lambda_sweep(timesteps=args.timesteps)
     if args.which in ("window", "both"):
         window_sweep(timesteps=args.timesteps)
+    if args.which == "seed":
+        seeds = tuple(int(s) for s in args.seeds.split(","))
+        if args.real:
+            seed_sweep(
+                tickers=REAL_TICKERS, use_dummy=False,
+                start="2019-01-01", end="2026-09-29",
+                timesteps=args.timesteps, seeds=seeds,
+            )
+        else:
+            seed_sweep(timesteps=args.timesteps, seeds=seeds)
