@@ -90,7 +90,11 @@ class PortfolioEnv(gym.Env):
         asset_returns = self.returns[self.t]
         gross_return = float(np.dot(self.weights, asset_returns))
 
-        turnover = float(np.abs(new_weights - self.weights).sum())
+        # /2: 매도 측과 매수 측을 각각 |Δw|에 담으면 같은 거래대금이 두 번
+        # 잡힌다(예: A 100%→B 100% 전환 시 sum(|Δw|)=2.0이지만 실제 회전율은
+        # 1.0). 표준 관행 및 참고 프로젝트(Dynamic_Regime_Portfolio-luca)의
+        # cost_model.py::apply_to_rebalance와 동일하게 /2로 보정.
+        turnover = float(np.abs(new_weights - self.weights).sum()) / 2.0
         cost = turnover * self.fee_rate
         net_return = gross_return - cost
 

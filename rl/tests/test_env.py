@@ -56,6 +56,20 @@ def test_safe_guard_triggers_on_large_drawdown(env_inputs):
     assert info["drawdown"] > env.mdd_limit
 
 
+def test_turnover_is_one_way_not_double_counted(env_inputs):
+    """A 100% -> B 100%로 완전히 갈아타면 sum(|Δw|)=2.0이지만, 실제
+    회전율(turnover)은 1.0이어야 한다 (매도/매수를 두 번 세면 안 됨)."""
+    returns, rsi_df, macd_df = env_inputs
+    env = PortfolioEnv(returns, rsi_df, macd_df, window=20)
+    env.reset()
+    env.weights = np.array([1.0, 0.0, 0.0], dtype=np.float32)  # 전부 A0
+
+    action = np.array([-10.0, 10.0, -10.0], dtype=np.float32)  # softmax -> 거의 전부 A1
+    _, _, _, _, info = env.step(action)
+
+    assert info["turnover"] == pytest.approx(1.0, abs=1e-3)
+
+
 def test_episode_ends_at_data_boundary(env_inputs):
     returns, rsi_df, macd_df = env_inputs
     env = PortfolioEnv(returns, rsi_df, macd_df, window=20, mdd_limit=1.0)  # Safe-Guard 사실상 비활성화
