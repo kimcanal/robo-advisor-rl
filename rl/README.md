@@ -38,6 +38,7 @@ python -m pytest rl/tests -v
 | `config.py` | 수수료/슬리피지/윈도우/Safe-Guard 등 상수 |
 | `data/dummy_data.py` | 상관관계 있는 더미 가격 생성 (GBM 기반) |
 | `data/loader.py` | **데이터팀 인터페이스 계약** — `data/raw/{ticker}.csv` 우선, 없으면 더미로 자동 대체 |
+| `data/fetch_real_data.py` | yfinance로 실제 ETF 10종(SPY/QQQ/IWM/EFA/EEM/AGG/TLT/HYG/GLD/VNQ) 5년+ 데이터를 받아 `data/raw/`에 저장 — 조윤상님 정식 파이프라인 전 **임시 실데이터 검증용** |
 | `features.py` | 로그수익률, Z-score 정규화, RSI, MACD |
 | `pipeline.py` | 위 조각들을 합쳐 env 입력(수익률/RSI/MACD, 인덱스 정렬)으로 조립 |
 | `env/portfolio_env.py` | Gymnasium 커스텀 환경 (관측/행동 공간, Safe-Guard) |
@@ -65,6 +66,48 @@ python -m pytest rl/tests -v
   `tests/test_env.py::test_safe_guard_triggers_on_large_drawdown`으로 검증됨.
 - **거래비용**: 매 스텝 `turnover`(비중 변화량 합) x (수수료+슬리피지)를 net_return에서 차감.
 
+## 설계 근거 및 출처 (리포트 Why 섹션용)
+
+리포트가 요구하는 "왜 이 설정을 선택했는가"에 그대로 쓸 수 있도록 각 결정의
+근거와 출처를 정리한다. 링크 대신 저자/연도/제목으로 표기 — 검색해서
+원문을 직접 확인하고 인용할 것.
+
+| 결정 | 근거 | 출처 |
+|---|---|---|
+| PPO 알고리즘 사용 | on-policy로 안정적이고, 연속 행동공간(비중 조절)에 표준적으로 쓰임. clipped objective로 학습 불안정성(발산) 억제 | Schulman et al., 2017, "Proximal Policy Optimization Algorithms" (arXiv:1707.06347) |
+| 자산배분 RL에 PPO/Gym 커스텀 환경 적용 자체의 선례 | 금융 RL 분야에서 Gym 기반 커스텀 트레이딩 환경 + PPO/A2C 조합이 표준 베이스라인으로 자리잡음 | Liu et al., 2020, "FinRL: A Deep Reinforcement Learning Library for Automated Stock Trading" (arXiv:2011.09607) |
+| 행동공간을 softmax 연속값으로 (이산 대신) | 자산 10개 이상에서 이산 리밸런싱은 조합이 기하급수적으로 늘어남; softmax는 합=1·공매도금지 제약을 별도 프로젝션 없이 만족 | 위 FinRL 논문의 포트폴리오 배분 환경 설계와 동일한 관례 |
+| 보상함수에 샤프비율 반영 (변형2) | 변동성 대비 초과수익을 극대화한다는 표준 위험조정수익 개념 | Sharpe, W.F., 1966, "Mutual Fund Performance," Journal of Business |
+| 보상함수에 MDD 페널티 반영 (변형3) | 단순 변동성(샤프)과 달리 "연속 손실의 깊이"에 직접 페널티를 주어 꼬리위험을 억제 | Young, T.W., 1991 (Calmar Ratio 개념 — MDD 대비 수익 평가); 실무적으로는 손실 한도(스탑로스) 설계와 동일 발상 |
+| 소르티노 비율(하방 변동성만 사용) | 샤프비율은 상방 변동성도 페널티로 잡는 한계가 있어, 투자자가 실제로 꺼리는 하방 변동성만 분리 | Sortino & van der Meer, 1991, "Downside Risk," Journal of Portfolio Management |
+| VaR/CVaR 지표 채택 | 정규분포 가정 없이 실제 손실 분포의 꼬리 위험을 정량화; CVaR은 VaR을 넘는 손실의 기댓값이라 더 보수적 | Rockafellar & Uryasev, 2000, "Optimization of Conditional Value-at-Risk," Journal of Risk |
+| MVO(Markowitz) 비교 기준 | 정적 최적화의 이론적 표준. DRL(동적)과의 성과 차이를 "정적 vs 동적"이라는 명확한 축으로 비교 가능 | Markowitz, H., 1952, "Portfolio Selection," Journal of Finance |
+| MVO 공분산 252일 롤링 윈도우 | 실무에서 1년(약 252거래일)을 변동성/공분산 추정의 표준 관측 기간으로 사용(계절성 대비 충분히 길고, 구조변화 대비 너무 길지 않음) | 업계 표준 관행 (예: RiskMetrics 방법론류) |
+| SHAP 기반 해석 | 게임이론 Shapley value를 모델-불가지론적으로 근사해, 각 피처가 예측에 기여한 정도를 가법적으로 분해 — 금융 XAI 규제 대응에 적합 | Lundberg & Lee, 2017, "A Unified Approach to Interpreting Model Predictions," NeurIPS (arXiv:1705.07874) |
+| ANOVA + Tukey HSD | 3개 이상 그룹 평균 차이의 통계적 유의성을 한 번에 검정(개별 t-검정 반복 시 발생하는 다중비교 오류 방지); 유의하면 Tukey HSD로 어느 쌍이 다른지 사후 검정 | Fisher, R.A., 1925, "Statistical Methods for Research Workers" (ANOVA); Tukey, J.W., 1949, "Comparing Individual Means in the Analysis of Variance" (사후검정) |
+| 관측 윈도우 N=20~60 | 미션 스펙 자체가 명시한 범위 — N이 작으면 단기 모멘텀에 민감(차원 낮아 학습 빠름), N이 크면 추세 반영(차원 커져 학습 느림). 실제 트레이드오프는 `experiments.py::window_sweep`으로 검증 | 과제 스펙 4-2 설계 가이드 + `rl/outputs/experiments/window_sweep.csv` 실험 결과 |
+| RSI(14일)/MACD(12,26,9) 파라미터 | 기술적 분석에서 가장 널리 쓰이는 표준 파라미터 (교재/실무 관행) | Wilder, J.W., 1978, "New Concepts in Technical Trading Systems" (RSI); Appel, G. (MACD 창안자) |
+| 거래수수료 0.015%/슬리피지 0.05% | 임의 선택이 아니라 **과제 스펙 4-2에 고정값으로 명시**된 제약 | 과제 스펙 (자체 근거 불필요, "요구사항 준수"가 근거) |
+| lambda(MDD 페널티 강도) 탐색범위 0.5~5.0 | 과제 스펙이 권장 범위로 명시; 실제 단조적 트레이드오프(lambda↑ → 수익률↓, MDD↓)가 나오는지는 `experiments.py::lambda_sweep`으로 검증 | 과제 스펙 4-3 + `rl/outputs/experiments/lambda_sweep.csv`, `lambda_tradeoff.png` |
+
+## 남은 실험 (리포트 "실험" 섹션 근거 자료 생성용)
+
+과제 스펙이 명시적으로 요구하는 두 실험을 `rl/experiments.py`에 자동화해뒀다.
+
+```bash
+# 보상 변형3의 lambda 트레이드오프 곡선 (스펙 4-3 요구사항)
+python -m rl.experiments --which lambda --timesteps 15000
+# -> rl/outputs/experiments/lambda_sweep.csv, lambda_tradeoff.png
+
+# 관측 윈도우 N=20 vs 60 비교 (스펙 4-2 설계 가이드 요구사항)
+python -m rl.experiments --which window --timesteps 15000
+```
+
+⚠️ 여기 쓴 timesteps(1.5만)도 여전히 데모 수준이다. **리포트에 실제로 넣을
+숫자**는 본 학습(10만 스텝 이상, 10자산 이상, 여유 시간에 백그라운드로)을
+돌린 뒤의 결과로 교체해야 한다 — 지금 이 실험은 "코드가 트레이드오프를
+올바르게 재현하는지"를 확인하는 용도.
+
 ## 알려진 한계 / TODO (다음 단계)
 
 1. 포트폴리오 수익률을 "자산별 로그수익률의 가중합"으로 근사 중 — 엄밀한 정의는
@@ -74,6 +117,9 @@ python -m pytest rl/tests -v
 3. SHAP은 `KernelExplainer` 기반이라 자산 수/윈도우가 커지면 느려짐. 10자산+윈도우
    30이면 관측 차원이 400에 육박 — 배경 표본을 줄이거나 `nsamples`를 낮출 것.
 4. 실데이터 연결: `data/raw/{ticker}.csv`에 `Date`, `Close`/`Adj Close` 컬럼의 CSV를
-   넣기만 하면 됨 (조윤상 파이프라인 완료 시).
+   넣기만 하면 됨 (조윤상 파이프라인 완료 시). 지금은 `fetch_real_data.py`로 받은
+   yfinance 데이터가 임시로 들어가 있음 — **yfinance는 비상업적 목적만 허용**이라
+   `data/raw/*.csv`는 `.gitignore`로 제외해 리포지토리에는 올리지 않음(라이선스 준수).
+   정식 데이터는 조윤상님 파이프라인 결과로 교체할 것.
 5. 리스크 태그(RAG팀) 연동: 아직 관측 공간에 반영 안 함. 인터페이스 오면
    `env/portfolio_env.py`의 관측 공간에 축 하나 추가.

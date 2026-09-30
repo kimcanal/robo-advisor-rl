@@ -42,12 +42,13 @@ def rollout(model, env: PortfolioEnv):
     return np.array(returns), np.array(obs_history)
 
 
-def main(n_assets=6, window=WINDOW_SIZE, timesteps=8000, test_days=252):
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    tickers = [f"A{i}" for i in range(n_assets)]
+def main(n_assets=6, window=WINDOW_SIZE, timesteps=8000, test_days=252, tickers=None, use_dummy=True, start="2019-01-01", end="2024-12-31", out_dir=None):
+    out_dir = Path(out_dir) if out_dir else OUT_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
+    tickers = tickers or [f"A{i}" for i in range(n_assets)]
 
-    print(f"[demo] 더미 데이터 준비: {tickers}")
-    _, returns, rsi_df, macd_df = prepare_env_inputs(tickers, use_dummy=True)
+    print(f"[demo] 데이터 준비 (use_dummy={use_dummy}): {tickers}")
+    _, returns, rsi_df, macd_df = prepare_env_inputs(tickers, start=start, end=end, use_dummy=use_dummy)
 
     split = len(returns) - test_days
     train_slice = slice(0, split)
@@ -63,7 +64,7 @@ def main(n_assets=6, window=WINDOW_SIZE, timesteps=8000, test_days=252):
             returns.iloc[train_slice], rsi_df.iloc[train_slice], macd_df.iloc[train_slice],
             window=window, reward_type=rt,
         )
-        monitor_path = OUT_DIR / f"monitor_{rt}"
+        monitor_path = out_dir / f"monitor_{rt}"
         monitored_env = Monitor(train_env, filename=str(monitor_path))
         model = PPO("MlpPolicy", monitored_env, verbose=0, seed=0)
         model.learn(total_timesteps=timesteps)
@@ -95,7 +96,7 @@ def main(n_assets=6, window=WINDOW_SIZE, timesteps=8000, test_days=252):
         metrics_table[name] = compute_metrics(series, benchmark=equal_weight_returns)
     metrics_df = pd.DataFrame(metrics_table).T
     print(metrics_df.round(4))
-    metrics_df.to_csv(OUT_DIR / "metrics_comparison.csv")
+    metrics_df.to_csv(out_dir / "metrics_comparison.csv")
 
     # --- ANOVA 검증 1: 보상함수 3종 비교 ---
     reward_groups = {k: all_series[f"drl_{k}"] for k in reward_types}
@@ -119,11 +120,11 @@ def main(n_assets=6, window=WINDOW_SIZE, timesteps=8000, test_days=252):
     shap_paths = explain_decision(
         model, background_obs=obs_hist[:-1], target_obs=obs_hist[-1],
         asset_index=top_asset_idx, feature_names=feature_names,
-        out_dir=OUT_DIR, nsamples=100,
+        out_dir=out_dir, nsamples=100,
     )
     print(f"[demo] SHAP plots 저장: {shap_paths}")
 
-    print(f"\n[demo] 모든 산출물 -> {OUT_DIR}")
+    print(f"\n[demo] 모든 산출물 -> {out_dir}")
 
 
 if __name__ == "__main__":
@@ -131,5 +132,15 @@ if __name__ == "__main__":
     parser.add_argument("--n-assets", type=int, default=6)
     parser.add_argument("--timesteps", type=int, default=8000)
     parser.add_argument("--test-days", type=int, default=252)
+    parser.add_argument("--tickers", type=str, default=None, help="쉼표로 구분된 실제 티커 목록 (예: SPY,QQQ,...)")
+    parser.add_argument("--start", type=str, default="2019-01-01")
+    parser.add_argument("--end", type=str, default="2024-12-31")
+    parser.add_argument("--out-dir", type=str, default=None)
     args = parser.parse_args()
-    main(n_assets=args.n_assets, timesteps=args.timesteps, test_days=args.test_days)
+
+    tickers = args.tickers.split(",") if args.tickers else None
+    main(
+        n_assets=args.n_assets, timesteps=args.timesteps, test_days=args.test_days,
+        tickers=tickers, use_dummy=tickers is None, start=args.start, end=args.end,
+        out_dir=args.out_dir,
+    )
