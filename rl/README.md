@@ -92,6 +92,20 @@ python -m pytest rl/tests -v
 | 거래수수료 0.015%/슬리피지 0.05% | 임의 선택이 아니라 **과제 스펙 4-2에 고정값으로 명시**된 제약 | 과제 스펙 (자체 근거 불필요, "요구사항 준수"가 근거) |
 | lambda(MDD 페널티 강도) 탐색범위 0.5~5.0 | 과제 스펙이 권장 범위로 명시; 실제 단조적 트레이드오프(lambda↑ → 수익률↓, MDD↓)가 나오는지는 `experiments.py::lambda_sweep`으로 검증 | 과제 스펙 4-3 + `rl/outputs/experiments/lambda_sweep.csv`, `lambda_tradeoff.png` |
 | 시장 국면(Bull/Flat/Bear) 판정 방식 | 이동평균(5/20/60일)·VWAP·변동성보정 ROC 4개 기술적 조건의 다수결 — 학습 없이 재현 가능하고 look-ahead 없음(전일까지 데이터만 사용) | 자체 구현이 아니라 참고 프로젝트에서 이식: `Dynamic_Regime_Portfolio-luca/models/score_model.py::ScoreRegimeDetector` (원본은 S&P500 전종목 breadth 조건 포함, 우리는 개별종목 유니버스가 없어 핵심 4개 조건만 이식) |
+| 무위험이자율을 0 대신 실제 단기국채(BIL)로 | 위 참고 프로젝트 CONSTITUTION도 동일 원칙("하드코딩 상수 대신 BIL/SOFR 동적 사용")을 명시 — 두 출처가 같은 결론이라 근거가 탄탄함 | `Dynamic_Regime_Portfolio-luca/docs/CONSTITUTION.md` §5.4 + `rl/riskfree.py` |
+
+### 국면 탐지기(`regime.py`) 검증
+
+실제 역사적 사건과 대조해서 탐지기가 말이 되는 라벨을 내는지 확인함 (2026-09-30):
+
+| 기간 | Bull/Flat/Bear 비율 | 실제 사실과 일치? |
+|---|---|---|
+| COVID 폭락 (2020-02~04) | bear 56% / bull 38% / flat 6% | ✅ 폭락+4월 반등 초입이 섞여 타당 |
+| 2022 금리인상 약세장 | bear 54% / bull 26% / flat 20% | ✅ |
+| 2021 강세장 | bull 77% / flat 18% / bear 5% | ✅ |
+| 2023 회복장 | bull 53% / flat 24% / bear 22% | ✅ (상반기 혼조 반영) |
+
+재현: `python3 -c "from rl.regime import load_spy_regime; ..."` (기간별 `.value_counts()` 확인)
 
 ## 남은 실험 (리포트 "실험" 섹션 근거 자료 생성용)
 

@@ -21,6 +21,7 @@ from .env.portfolio_env import PortfolioEnv
 from .mvo import rolling_mvo_backtest
 from .pipeline import prepare_env_inputs
 from .regime import MarketRegimeDetector, load_spy_regime
+from .riskfree import fetch_risk_free_rate
 from .run_demo import rollout
 from .stats_tests import one_way_anova, two_way_anova
 
@@ -49,6 +50,9 @@ def run(
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     tickers = tickers or [f"A{i}" for i in range(10)]
     _, returns, rsi_df, macd_df = prepare_env_inputs(tickers, start=start, end=end, use_dummy=use_dummy, verbose=False)
+
+    risk_free = fetch_risk_free_rate(start, end) if not use_dummy else 0.0
+    print(f"[walk_forward] risk_free_rate={risk_free:.4f} (연율화, BIL 기준)")
 
     windows = walk_forward_windows(returns.index, train_years=train_years, test_years=test_years, n_windows=n_windows)
     if not windows:
@@ -88,7 +92,7 @@ def run(
 
                 test_env = PortfolioEnv(test_returns, test_rsi, test_macd, window=window, reward_type=rt, reward_kwargs=reward_kwargs)
                 rets, _ = rollout(model, test_env)
-                metrics = compute_metrics(pd.Series(rets))
+                metrics = compute_metrics(pd.Series(rets), risk_free=risk_free)
                 rows.append({"window": w_idx + 1, "strategy": f"drl_{rt}", "seed": seed, **metrics})
                 print(f"[walk_forward] window{w_idx+1} {rt} seed{seed} -> return={metrics['cumulative_return']:.4f}, mdd={metrics['mdd']:.4f}")
 
@@ -100,7 +104,7 @@ def run(
         mvo_ret = rolling_mvo_backtest(combined_for_mvo).iloc[-len(test_returns.iloc[window:]):]
         equal_ret = test_returns.iloc[window:].mean(axis=1)
         for name, series in [("mvo", mvo_ret), ("equal_weight", equal_ret)]:
-            metrics = compute_metrics(series)
+            metrics = compute_metrics(series, risk_free=risk_free)
             rows.append({"window": w_idx + 1, "strategy": name, "seed": None, **metrics})
             print(f"[walk_forward] window{w_idx+1} {name} -> return={metrics['cumulative_return']:.4f}, mdd={metrics['mdd']:.4f}")
             for d, r in series.items():

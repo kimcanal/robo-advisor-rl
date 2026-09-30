@@ -38,7 +38,7 @@ def _split(returns, rsi_df, macd_df, window, test_days):
     )
 
 
-def _train_and_eval(train_data, test_data, window, reward_type, reward_kwargs, timesteps, seed=0):
+def _train_and_eval(train_data, test_data, window, reward_type, reward_kwargs, timesteps, seed=0, risk_free=0.0):
     train_env = PortfolioEnv(*train_data, window=window, reward_type=reward_type, reward_kwargs=reward_kwargs)
     model = PPO("MlpPolicy", train_env, verbose=0, seed=seed)
     model.learn(total_timesteps=timesteps)
@@ -46,7 +46,7 @@ def _train_and_eval(train_data, test_data, window, reward_type, reward_kwargs, t
     test_env = PortfolioEnv(*test_data, window=window, reward_type=reward_type, reward_kwargs=reward_kwargs)
     rets, _ = rollout(model, test_env)
     series = pd.Series(rets)
-    metrics = compute_metrics(series)
+    metrics = compute_metrics(series, risk_free=risk_free)
     return metrics
 
 
@@ -138,12 +138,16 @@ def seed_sweep(
     _, returns, rsi_df, macd_df = prepare_env_inputs(tickers, start=start, end=end, use_dummy=use_dummy, verbose=False)
     train_data, test_data = _split(returns, rsi_df, macd_df, window, test_days)
 
+    from .riskfree import fetch_risk_free_rate
+    risk_free = fetch_risk_free_rate(start, end) if not use_dummy else 0.0
+    print(f"[seed_sweep] risk_free_rate={risk_free:.4f}")
+
     rows = []
     for rt in reward_types:
         reward_kwargs = {"mdd_lambda": 1.0} if rt == "mdd_penalty" else {}
         for seed in seeds:
             print(f"[seed_sweep] reward={rt} seed={seed} 학습 중...")
-            metrics = _train_and_eval(train_data, test_data, window, rt, reward_kwargs, timesteps, seed=seed)
+            metrics = _train_and_eval(train_data, test_data, window, rt, reward_kwargs, timesteps, seed=seed, risk_free=risk_free)
             rows.append({"reward_type": rt, "seed": seed, **metrics})
             print(f"[seed_sweep] reward={rt} seed={seed} -> return={metrics['cumulative_return']:.4f}, sharpe={metrics['sharpe']:.3f}, mdd={metrics['mdd']:.4f}")
 

@@ -22,6 +22,7 @@ from .config import WINDOW_SIZE
 from .env.portfolio_env import PortfolioEnv
 from .mvo import rolling_mvo_backtest
 from .pipeline import prepare_env_inputs
+from .riskfree import fetch_risk_free_rate
 from .shap_explain import build_feature_names, explain_decision
 from .stats_tests import one_way_anova
 from .train import _plot_learning_curve
@@ -49,6 +50,8 @@ def main(n_assets=6, window=WINDOW_SIZE, timesteps=8000, test_days=252, tickers=
 
     print(f"[demo] 데이터 준비 (use_dummy={use_dummy}): {tickers}")
     _, returns, rsi_df, macd_df = prepare_env_inputs(tickers, start=start, end=end, use_dummy=use_dummy)
+    risk_free = fetch_risk_free_rate(start, end) if not use_dummy else 0.0
+    print(f"[demo] risk_free_rate={risk_free:.4f} (연율화, BIL 기준)")
 
     split = len(returns) - test_days
     train_slice = slice(0, split)
@@ -93,7 +96,7 @@ def main(n_assets=6, window=WINDOW_SIZE, timesteps=8000, test_days=252, tickers=
     print("\n[demo] === 성과 지표 비교 (아웃오브샘플) ===")
     metrics_table = {}
     for name, series in all_series.items():
-        metrics_table[name] = compute_metrics(series, benchmark=equal_weight_returns)
+        metrics_table[name] = compute_metrics(series, benchmark=equal_weight_returns, risk_free=risk_free)
     metrics_df = pd.DataFrame(metrics_table).T
     print(metrics_df.round(4))
     metrics_df.to_csv(out_dir / "metrics_comparison.csv")
