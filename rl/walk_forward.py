@@ -22,8 +22,8 @@ from .mvo import rolling_mvo_backtest
 from .pipeline import prepare_env_inputs
 from .regime import MarketRegimeDetector, load_spy_regime
 from .riskfree import fetch_risk_free_rate
-from .run_demo import rollout
 from .stats_tests import one_way_anova, two_way_anova
+from .vecnorm import make_eval_vecnorm, make_train_vecnorm, rollout_vecnorm
 
 OUT_DIR = Path(__file__).parent / "outputs" / "walk_forward"
 REAL_TICKERS = ["SPY", "QQQ", "IWM", "EFA", "EEM", "AGG", "TLT", "HYG", "GLD", "VNQ"]
@@ -86,12 +86,14 @@ def run(
         for rt in reward_types:
             reward_kwargs = {"mdd_lambda": 1.0} if rt == "mdd_penalty" else {}
             for seed in seeds:
-                train_env = PortfolioEnv(train_returns, train_rsi, train_macd, window=window, reward_type=rt, reward_kwargs=reward_kwargs)
-                model = PPO("MlpPolicy", train_env, verbose=0, seed=seed)
+                train_env_fn = lambda: PortfolioEnv(train_returns, train_rsi, train_macd, window=window, reward_type=rt, reward_kwargs=reward_kwargs)
+                train_venv = make_train_vecnorm(train_env_fn)
+                model = PPO("MlpPolicy", train_venv, verbose=0, seed=seed)
                 model.learn(total_timesteps=timesteps)
 
-                test_env = PortfolioEnv(test_returns, test_rsi, test_macd, window=window, reward_type=rt, reward_kwargs=reward_kwargs)
-                rets, _ = rollout(model, test_env)
+                test_env_fn = lambda: PortfolioEnv(test_returns, test_rsi, test_macd, window=window, reward_type=rt, reward_kwargs=reward_kwargs)
+                eval_venv = make_eval_vecnorm(test_env_fn, train_venv)
+                rets, _ = rollout_vecnorm(model, eval_venv)
                 metrics = compute_metrics(pd.Series(rets), risk_free=risk_free)
                 rows.append({"window": w_idx + 1, "strategy": f"drl_{rt}", "seed": seed, **metrics})
                 print(f"[walk_forward] window{w_idx+1} {rt} seed{seed} -> return={metrics['cumulative_return']:.4f}, mdd={metrics['mdd']:.4f}")

@@ -21,19 +21,19 @@ from stable_baselines3.common.monitor import Monitor
 from .config import MDD_LAMBDA_DEFAULT, WINDOW_SIZE
 from .env.portfolio_env import PortfolioEnv
 from .pipeline import prepare_env_inputs
+from .vecnorm import make_train_vecnorm
 
 DEFAULT_TICKERS = [f"A{i}" for i in range(10)]
 OUT_DIR = Path(__file__).parent / "outputs"
 
 
-def build_env(tickers, start, end, use_dummy, reward_type, window):
+def build_env_fn(tickers, start, end, use_dummy, reward_type, window):
     _, returns, rsi_df, macd_df = prepare_env_inputs(tickers, start, end, use_dummy=use_dummy)
     reward_kwargs = {"mdd_lambda": MDD_LAMBDA_DEFAULT} if reward_type == "mdd_penalty" else {}
-    env = PortfolioEnv(
+    return lambda: PortfolioEnv(
         returns, rsi_df, macd_df,
         window=window, reward_type=reward_type, reward_kwargs=reward_kwargs,
     )
-    return env
 
 
 def train(
@@ -52,18 +52,22 @@ def train(
     (OUT_DIR / "plots").mkdir(exist_ok=True)
     (OUT_DIR / "logs").mkdir(exist_ok=True)
 
-    env = build_env(tickers, start, end, use_dummy, reward_type, window)
+    env_fn = build_env_fn(tickers, start, end, use_dummy, reward_type, window)
     monitor_path = OUT_DIR / "logs" / f"monitor_{reward_type}"
-    env = Monitor(env, filename=str(monitor_path))
+    monitored_env_fn = lambda: Monitor(env_fn(), filename=str(monitor_path))
+    train_venv = make_train_vecnorm(monitored_env_fn)
 
-    model = PPO("MlpPolicy", env, verbose=1, seed=seed)
+    model = PPO("MlpPolicy", train_venv, verbose=1, seed=seed)
     model.learn(total_timesteps=timesteps)
 
     model_path = OUT_DIR / "models" / f"ppo_{reward_type}.zip"
     model.save(model_path)
+    vecnorm_path = OUT_DIR / "models" / f"vecnorm_{reward_type}.pkl"
+    train_venv.save(str(vecnorm_path))
 
     plot_path = _plot_learning_curve(monitor_path, reward_type)
     print(f"[train] saved model -> {model_path}")
+    print(f"[train] saved VecNormalize stats -> {vecnorm_path} (평가/추론 시 반드시 같이 로드할 것)")
     print(f"[train] saved learning curve -> {plot_path}")
     return model, str(model_path), str(plot_path)
 

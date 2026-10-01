@@ -26,21 +26,14 @@ from .riskfree import fetch_risk_free_rate
 from .shap_explain import build_feature_names, explain_decision
 from .stats_tests import one_way_anova
 from .train import _plot_learning_curve
+from .vecnorm import make_eval_vecnorm, make_train_vecnorm, rollout_vecnorm
 
 OUT_DIR = Path(__file__).parent / "outputs" / "demo"
 
 
-def rollout(model, env: PortfolioEnv):
-    obs, _ = env.reset()
-    returns, obs_history = [], []
-    done = False
-    while not done:
-        obs_history.append(obs)
-        action, _ = model.predict(obs, deterministic=True)
-        obs, reward, terminated, truncated, info = env.step(action)
-        returns.append(info["net_return"])
-        done = terminated or truncated
-    return np.array(returns), np.array(obs_history)
+def rollout(model, eval_venv):
+    """VecNormalize로 감싼 평가 환경에서 1 에피소드를 굴린다 (vecnorm.rollout_vecnorm의 얇은 래퍼)."""
+    return rollout_vecnorm(model, eval_venv)
 
 
 def main(n_assets=6, window=WINDOW_SIZE, timesteps=8000, test_days=252, tickers=None, use_dummy=True, start="2019-01-01", end="2024-12-31", out_dir=None):
@@ -63,22 +56,26 @@ def main(n_assets=6, window=WINDOW_SIZE, timesteps=8000, test_days=252, tickers=
 
     for rt in reward_types:
         print(f"\n[demo] === reward={rt} 학습 시작 ({timesteps} steps) ===")
-        train_env = PortfolioEnv(
-            returns.iloc[train_slice], rsi_df.iloc[train_slice], macd_df.iloc[train_slice],
-            window=window, reward_type=rt,
-        )
         monitor_path = out_dir / f"monitor_{rt}"
-        monitored_env = Monitor(train_env, filename=str(monitor_path))
-        model = PPO("MlpPolicy", monitored_env, verbose=0, seed=0)
+        train_env_fn = lambda: Monitor(
+            PortfolioEnv(
+                returns.iloc[train_slice], rsi_df.iloc[train_slice], macd_df.iloc[train_slice],
+                window=window, reward_type=rt,
+            ),
+            filename=str(monitor_path),
+        )
+        train_venv = make_train_vecnorm(train_env_fn)
+        model = PPO("MlpPolicy", train_venv, verbose=0, seed=0)
         model.learn(total_timesteps=timesteps)
         _plot_learning_curve(monitor_path, rt)
 
-        test_env = PortfolioEnv(
+        test_env_fn = lambda: PortfolioEnv(
             returns.iloc[test_slice], rsi_df.iloc[test_slice], macd_df.iloc[test_slice],
             window=window, reward_type=rt,
         )
-        rets, obs_hist = rollout(model, test_env)
-        trained[rt] = (model, test_env, obs_hist)
+        eval_venv = make_eval_vecnorm(test_env_fn, train_venv)
+        rets, obs_hist = rollout(model, eval_venv)
+        trained[rt] = (model, eval_venv, obs_hist)
         test_returns[rt] = pd.Series(rets, name=rt)
         print(f"[demo] reward={rt} 아웃오브샘플 누적수익률={np.expm1(rets.sum()):.4f}")
 
@@ -117,9 +114,10 @@ def main(n_assets=6, window=WINDOW_SIZE, timesteps=8000, test_days=252, tickers=
 
     # --- SHAP: mdd_penalty 모델의 마지막 시점 의사결정 설명 ---
     print("\n[demo] SHAP 해석 계산 중 (몇 분 걸릴 수 있음)...")
-    model, test_env, obs_hist = trained["mdd_penalty"]
+    model, eval_venv, obs_hist = trained["mdd_penalty"]
     feature_names = build_feature_names(tickers, window)
-    top_asset_idx = int(np.argmax(test_env.weights))
+    final_weights = eval_venv.get_attr("weights")[0]
+    top_asset_idx = int(np.argmax(final_weights))
     shap_paths = explain_decision(
         model, background_obs=obs_hist[:-1], target_obs=obs_hist[-1],
         asset_index=top_asset_idx, feature_names=feature_names,

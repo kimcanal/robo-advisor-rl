@@ -23,7 +23,7 @@ from .backtest import compute_metrics
 from .config import WINDOW_SIZE
 from .env.portfolio_env import PortfolioEnv
 from .pipeline import prepare_env_inputs
-from .run_demo import rollout
+from .vecnorm import make_eval_vecnorm, make_train_vecnorm, rollout_vecnorm
 
 OUT_DIR = Path(__file__).parent / "outputs" / "experiments"
 
@@ -39,12 +39,14 @@ def _split(returns, rsi_df, macd_df, window, test_days):
 
 
 def _train_and_eval(train_data, test_data, window, reward_type, reward_kwargs, timesteps, seed=0, risk_free=0.0):
-    train_env = PortfolioEnv(*train_data, window=window, reward_type=reward_type, reward_kwargs=reward_kwargs)
-    model = PPO("MlpPolicy", train_env, verbose=0, seed=seed)
+    train_env_fn = lambda: PortfolioEnv(*train_data, window=window, reward_type=reward_type, reward_kwargs=reward_kwargs)
+    train_venv = make_train_vecnorm(train_env_fn)
+    model = PPO("MlpPolicy", train_venv, verbose=0, seed=seed)
     model.learn(total_timesteps=timesteps)
 
-    test_env = PortfolioEnv(*test_data, window=window, reward_type=reward_type, reward_kwargs=reward_kwargs)
-    rets, _ = rollout(model, test_env)
+    test_env_fn = lambda: PortfolioEnv(*test_data, window=window, reward_type=reward_type, reward_kwargs=reward_kwargs)
+    eval_venv = make_eval_vecnorm(test_env_fn, train_venv)
+    rets, _ = rollout_vecnorm(model, eval_venv)
     series = pd.Series(rets)
     metrics = compute_metrics(series, risk_free=risk_free)
     return metrics
