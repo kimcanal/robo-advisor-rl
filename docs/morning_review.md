@@ -5,7 +5,7 @@
 
 ## Do first
 
-1. Open [PR #3](https://github.com/kimcanal/robo-advisor-rl/pull/3) — tip should be `6e2e1c0` or later; **CI green**.
+1. Open [PR #3](https://github.com/kimcanal/robo-advisor-rl/pull/3) — tip should be `0f64419` or later; **CI green**.
 2. Skim diff: API/Streamlit/Docker/RAG stubs + docs only; RL training core unchanged aside from earlier KS11 soft-fail on master.
 3. Optional: `make compose-up` or `make api` + Swagger `/docs`; with API up, `make smoke` hits `/health`.
 
