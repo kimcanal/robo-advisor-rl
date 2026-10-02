@@ -60,7 +60,10 @@
 1. **데이터팀 → 강화학습팀**
    `rl/data/raw/{ticker}.csv` 에 `Date`, `Close`(또는 `Adj Close`) 컬럼을 가진 CSV만
    두면 강화학습 모듈은 코드 변경 없이 실제 데이터로 전환됩니다.
-   (지금은 이 파일들이 없어 `rl/data/dummy_data.py`가 자동으로 더미 데이터를 생성합니다.)
+   (해당 티커 CSV가 없으면 `rl/data/dummy_data.py`가 자동으로 더미 데이터로 대체합니다.
+   지금은 `rl/data/fetch_real_data.py`로 받은 실제 ETF 10종으로 검증 중이며,
+   정식 파이프라인이 오면 그걸로 교체하면 됩니다. raw CSV는 라이선스상
+   `.gitignore`로 제외되어 있어 리포지토리를 받아도 각자 다시 받아야 합니다.)
 
 2. **리서치·RAG팀 → 강화학습팀**
    위험 이벤트를 `{ticker, risk_score(0~1), tag, timestamp}` 형태로 넘겨주면,
@@ -86,10 +89,20 @@
 - 중간 보고: 2026-11-09 주
 - 완료 보고: 2026-12-14
 
-## 현재 상태 (2026-09-30 기준)
+## 현재 상태 (2026-10-02 기준)
 
-- ✅ 강화학습 모듈: 환경/보상 3종/PPO 학습/백테스트 12지표/MVO 비교/SHAP/ANOVA
-  스캐폴딩 완료, 더미 데이터로 end-to-end 검증됨 (`rl/README.md` 참고)
+- ✅ 강화학습 모듈: 환경/보상 3종/PPO+VecNormalize 학습/백테스트 12지표/MVO 비교/
+  SHAP/ANOVA(One-way×2, Two-way) 전부 구현, **실제 ETF 10종 데이터로 검증 완료**
+  (`rl/README.md` 참고)
+- ✅ 버그 2개 발견·수정: 거래비용(turnover) 2배 과다계산, 무위험이자율 하드코딩(0)
+- ✅ 시장 국면(Bull/Flat/Bear) 탐지기 추가 — 참고 프로젝트에서 핵심 로직만 이식,
+  역사적 사건(코로나/2022 약세장/2021 강세장)과 대조 검증 완료
+- ✅ VecNormalize 적용 전후 비교: 동일 시드(5~9) 기준 simple·mdd_penalty 보상함수가
+  수익률↑·MDD↓ 동시 개선을 재현성 있게 확인 (`rl/outputs/experiments/` 참고)
+- ⚠️ Walk-Forward(`walk_forward.py`)는 VecNormalize 적용 **이전** 코드로 돌린 결과임 —
+  재실행하면 수치가 달라질 수 있음 (다음 작업 후보)
+- ⏳ 동일가중 포트폴리오를 아직 절대수치로는 못 이김 — 원인 추적 중 (관측값에
+  drawdown 미포함 등), 과제 스펙의 Why/How 문서화 요구에 맞춰 계속 기록 중
 - ⏳ 데이터팀 실제 수집 파이프라인 대기 중 (연결되면 `rl/data/raw/`에 CSV만 추가)
 - ⏳ 리서치·RAG 리스크 태그 인터페이스 대기 중
 - ⏳ FastAPI/Streamlit/Docker는 백엔드팀 담당, 아직 미착수

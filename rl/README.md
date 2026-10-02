@@ -129,8 +129,9 @@ python -m rl.experiments --which window --timesteps 15000
 
 1. 포트폴리오 수익률을 "자산별 로그수익률의 가중합"으로 근사 중 — 엄밀한 정의는
    아니지만 FinRL 등에서 흔히 쓰는 단순화. 리포트에 명시 필요.
-2. Walk-Forward 백테스트는 함수(`walk_forward_windows`)만 있고, "윈도우 이동 시
-   모델 재학습"까지 자동화된 스크립트는 아직 없음 — 실 데이터로 본 학습 돌릴 때 추가.
+2. Walk-Forward 자체는 `walk_forward.py`로 자동화 완료(윈도우 이동마다 실제 재학습).
+   다만 이 스크립트는 **VecNormalize 도입 이전** 버전으로 돌린 결과가 마지막이라,
+   VecNormalize 적용 후 재실행하면 수치가 바뀔 수 있음 — 다음 실행 후보.
 3. SHAP은 `KernelExplainer` 기반이라 자산 수/윈도우가 커지면 느려짐. 10자산+윈도우
    30이면 관측 차원이 400에 육박 — 배경 표본을 줄이거나 `nsamples`를 낮출 것.
 4. 실데이터 연결: `data/raw/{ticker}.csv`에 `Date`, `Close`/`Adj Close` 컬럼의 CSV를
@@ -140,3 +141,6 @@ python -m rl.experiments --which window --timesteps 15000
    정식 데이터는 조윤상님 파이프라인 결과로 교체할 것.
 5. 리스크 태그(RAG팀) 연동: 아직 관측 공간에 반영 안 함. 인터페이스 오면
    `env/portfolio_env.py`의 관측 공간에 축 하나 추가.
+6. 관측 공간에 "현재 낙폭(drawdown)"이 빠져있음. mdd_penalty 보상이 낙폭에
+   페널티를 주는데 정작 에이전트는 자기 낙폭 상태를 직접 볼 수 없어서, Safe-Guard를
+   피하라고 학습시키기 어려운 구조적 한계로 보임 — 다음 개선 후보.
