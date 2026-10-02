@@ -4,3 +4,7 @@ __pycache__/
 .pytest_cache/
 rl/outputs/
 rl/data/raw/*.csv
+
+.env
+*.egg-info/
+.ruff_cache/

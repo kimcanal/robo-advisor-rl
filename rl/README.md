@@ -166,3 +166,22 @@ python -m rl.experiments --which window --timesteps 15000
    위험이 있음. Walk-Forward처럼 여러 구간에 교차검증해야 더 엄밀하지만 아직 안 함
    (참고 프로젝트의 "Grid Search가 단일 기간 최적화만 해서 데이터마이닝 편향이 있다"는
    자체 지적과 동일한 한계).
+
+## Notion week-38 — RL module checklist pointers
+
+루트 README의 팀 제출 체크리스트와 맞춰, RL 쪽 근거 위치를 한곳에 모은다.
+
+| Notion 섹션 | RL 포인터 |
+|---|---|
+| Architecture (RL slice) | 위 모듈 맵 + 루트 아키텍처의 강화학습 박스 |
+| Reward rationale | 「설계 근거」「설계 근거 및 출처」표 — 보상 3종·Safe-Guard·수수료 |
+| Metrics | `backtest.compute_metrics` 12지표; Walk-Forward는 `walk_forward.py` |
+| ANOVA | `stats_tests.py` + `run_demo` / Walk-Forward 검증2·3 |
+| Error analysis | 「알려진 한계 / TODO」및 코드 감사 이력 표 |
+| Docker | 루트 `Dockerfile`이 `rl/`을 이미지에 포함 (학습 이미지 최적화는 TODO) |
+
+### Financial disclaimer (RL)
+
+강화학습·백테스트 결과는 **교육용**입니다. 과거(또는 더미) 경로에서의 지표는
+**미래 수익률을 예측·보장하지 않습니다.** 리포트·발표 자료에도 동일 고지를 넣을 것.
+

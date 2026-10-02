@@ -105,4 +105,46 @@
   drawdown 미포함 등), 과제 스펙의 Why/How 문서화 요구에 맞춰 계속 기록 중
 - ⏳ 데이터팀 실제 수집 파이프라인 대기 중 (연결되면 `rl/data/raw/`에 CSV만 추가)
 - ⏳ 리서치·RAG 리스크 태그 인터페이스 대기 중
-- ⏳ FastAPI/Streamlit/Docker는 백엔드팀 담당, 아직 미착수
+- ✅ FastAPI/Streamlit/Docker 스켈레톤 추가 (`api/`, `streamlit_app/`, `Dockerfile`, `docker-compose.yml`) — 백엔드팀이 확장할 뼈대
+
+## Notion week-38 submission checklist
+
+팀 Notion 제출/중간 점검용 체크리스트. 세부 구현은 담당 모듈 README를 따른다.
+
+| 섹션 | 상태 | 어디에 있나 |
+|---|---|---|
+| **Architecture** | ✅ 문서화 | 위 아키텍처 다이어그램 + 역할 인터페이스 계약 |
+| **Reward rationale** | ✅ 문서화 | `rl/README.md` 설계 근거 (simple / sharpe / mdd_penalty + 출처 표) |
+| **Docker placeholder** | ✅ 스켈레톤 | `Dockerfile`, `docker-compose.yml` (api + streamlit) |
+| **Metrics** | ✅ 코드 | `rl/backtest.py::compute_metrics` (12지표), API `GET /backtest` |
+| **ANOVA** | ✅ 코드 | `rl/stats_tests.py` (one-way / two-way + Tukey HSD) |
+| **Error analysis** | ⏳ 진행 | Walk-Forward·동일가중 미달 원인 추적 (`rl/README` 한계 6–7) |
+| **Financial disclaimer** | ✅ | 아래 고지 + API/Streamlit 캡션 |
+
+### API / UI quick start
+
+```bash
+source .venv/bin/activate
+pip install -r rl/requirements.txt -r requirements-api.txt
+
+# API (Swagger: http://127.0.0.1:8000/docs)
+uvicorn api.main:app --reload --port 8000
+
+# Streamlit (API만 호출, 모델 직접 로드 금지)
+API_BASE_URL=http://127.0.0.1:8000 streamlit run streamlit_app/app.py
+
+# Docker
+docker compose up --build
+```
+
+Endpoints: `GET /health`, `POST /optimize`, `POST /explain`, `POST /research` (RAG stub), `GET /backtest`.
+
+## Financial disclaimer (필수 고지)
+
+**본 저장소는 교육·연구 목적의 데모입니다. 투자 자문이 아니며, 특정 증권의 매수·매도를 권유하지 않습니다.**
+
+- 백테스트·시뮬레이션 성과는 **과거 데이터(또는 합성 데이터)에 기반**하며 **미래 수익을 보장하지 않습니다** (backtests ≠ future returns).
+- 거래비용·슬리피지·유동성·세금·survivorship 등 실전 제약이 단순화되어 있을 수 있습니다.
+- API 키(`.env.example`)와 Docker 스택은 로컬 실험용이며, 라이브 브로커 연동은 기본 비활성입니다.
+- 실제 투자 결정은 본인 책임이며, 필요 시 자격 있는 전문가와 상담하세요.
+
