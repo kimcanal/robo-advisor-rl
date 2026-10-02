@@ -35,6 +35,10 @@ def prepare_env_inputs(
     rsi_df = rsi_df.loc[common_index]
     macd_df = macd_df.loc[common_index]
 
-    macd_df = (macd_df - macd_df.mean()) / macd_df.std().replace(0, 1e-8)
+    # MACD를 여기서 전체 기간(train+test) 평균/표준편차로 정규화하면 테스트
+    # 구간의 통계가 학습 시점 피처에 새어 들어가는 look-ahead bias가 된다
+    # (참고 프로젝트 코드 감사에서 동일 패턴을 지적받고 우리 코드에서도 발견).
+    # VecNormalize가 학습 데이터만으로 정규화 통계를 계산해 분할 이후에
+    # 적용하므로, 원본(raw) MACD를 그대로 넘기고 스케일링은 VecNormalize에 맡긴다.
 
     return prices.loc[common_index], returns, rsi_df, macd_df
