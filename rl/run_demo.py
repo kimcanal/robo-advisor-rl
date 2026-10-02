@@ -18,6 +18,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.monitor import Monitor
 
 from .backtest import compute_metrics
+from .benchmarks import BenchmarkDownloadError, load_market_benchmarks, synthetic_benchmark_returns
 from .config import WINDOW_SIZE
 from .env.portfolio_env import PortfolioEnv
 from .mvo import equal_weight_backtest, rolling_mvo_backtest
@@ -90,10 +91,27 @@ def main(n_assets=6, window=WINDOW_SIZE, timesteps=8000, test_days=252, tickers=
         "equal_weight": equal_weight_returns,
     }
 
+    # S&P500 + KOSPI 벤치마크를 12지표 비교표에 포함 (EW/MVO만이 아님)
+    try:
+        market = load_market_benchmarks(start, end, allow_download=True)
+        for bname, bseries in market.items():
+            aligned = bseries.reindex(test_returns_df.index).dropna()
+            if len(aligned):
+                all_series[bname] = aligned
+    except BenchmarkDownloadError as e:
+        if use_dummy:
+            print(f"[demo] 벤치마크 로드 실패 → 합성 폴백 ({e})")
+            all_series["spy"] = synthetic_benchmark_returns(test_returns_df.index, seed=1, name="spy")
+            all_series["kospi"] = synthetic_benchmark_returns(test_returns_df.index, seed=2, name="kospi")
+        else:
+            raise
+
     print("\n[demo] === 성과 지표 비교 (아웃오브샘플) ===")
     metrics_table = {}
+    spy_bench = all_series.get("spy", equal_weight_returns)
     for name, series in all_series.items():
-        metrics_table[name] = compute_metrics(series, benchmark=equal_weight_returns, risk_free=risk_free)
+        bench = equal_weight_returns if name == "spy" else spy_bench
+        metrics_table[name] = compute_metrics(series, benchmark=bench, risk_free=risk_free)
     metrics_df = pd.DataFrame(metrics_table).T
     print(metrics_df.round(4))
     metrics_df.to_csv(out_dir / "metrics_comparison.csv")
