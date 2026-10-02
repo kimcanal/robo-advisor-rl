@@ -44,8 +44,9 @@
 FastAPI `POST /research`가 이 스텁을 호출합니다. 응답 필드:
 
 - `risk_tags`, `report_excerpt`, **`stub: true`**
-- `plan`, `node_trace`, `citations`, `verify_ok`, `verify_notes`, `env_contract`
-- `latency_ms`
+- `plan`, `node_trace` (plan→retrieve→tag_risk→verify→summarize), `node_latencies_ms` (per-node stub timings)
+- `citations`, `verify_ok`, `verify_notes`, `env_contract`
+- `latency_ms` (total)
 
 ## 환경 변수 (optional)
 

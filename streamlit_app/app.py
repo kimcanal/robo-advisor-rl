@@ -48,10 +48,12 @@ with tabs[0]:
     st.subheader("Overview")
     st.write(
         "Architecture: **Streamlit → HTTP → FastAPI → rl.* / rag stub** "
-        "(plan → retrieve → tag_risk → verify → summarize)."
+        "(plan → retrieve → tag_risk → verify → summarize). "
+        "See `docs/architecture.md` (mermaid) and `docs/notion_submission_map.md`."
     )
     st.info(
-        "Notion docs (repo): `docs/error_analysis.md` (WF vs EW hypotheses), "
+        "Notion docs (repo): `docs/architecture.md`, `docs/notion_submission_map.md`, "
+        "`docs/error_analysis.md` (WF vs EW hypotheses), "
         "`docs/report/outline.md` (~20p PDF skeleton), "
         "`docs/performance_targets.md` (fill from Colab only). "
         "RAG/API responses keep **stub: true** until live LLM/artifacts land."
@@ -144,6 +146,14 @@ with tabs[3]:
                 f"trace: `{' → '.join(data.get('node_trace') or [])}` · "
                 f"latency_ms={data.get('latency_ms')}"
             )
+            node_lats = data.get("node_latencies_ms") or []
+            if node_lats:
+                st.caption(
+                    "node_latencies_ms: "
+                    + ", ".join(
+                        f"{x.get('node')}={x.get('latency_ms')}ms" for x in node_lats
+                    )
+                )
             st.markdown("**Plan**")
             for step in data.get("plan") or []:
                 st.write(f"- {step}")

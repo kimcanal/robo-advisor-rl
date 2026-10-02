@@ -59,6 +59,9 @@ def test_explain_stub():
     assert len(body["top_features"]) == 3
     assert body["mode"] in {"stub_pseudo_shap", "shap_kernel_attempted"}
     assert body.get("latency_ms") is not None
+    assert isinstance(body.get("summary"), str) and body["summary"]
+    for feat in body["top_features"]:
+        assert "feature" in feat and "contribution" in feat
 
 
 def test_explain_artifact_json(tmp_path, monkeypatch):
@@ -115,9 +118,24 @@ def test_research_graph_node_trace_in_excerpt():
     excerpt = body["report_excerpt"].lower()
     assert "retrieve" in excerpt or "fallback" in excerpt
     trace = body.get("node_trace") or []
+    assert trace == ["plan", "retrieve", "tag_risk", "verify", "summarize"] or "fallback" in trace
     assert "plan" in trace or "fallback" in trace
     assert "verify" in trace or "fallback" in trace
     assert body.get("latency_ms") is not None
+    node_lats = body.get("node_latencies_ms") or []
+    if "fallback" not in trace:
+        assert len(node_lats) == 5
+        assert [x["node"] for x in node_lats] == trace
+        assert all(x["latency_ms"] >= 0 for x in node_lats)
+
+
+def test_health_version_patch():
+    r = client.get("/health")
+    assert r.status_code == 200
+    # Keep in sync with api.__version__ (0.1.4+ after architecture / node_latencies).
+    ver = r.json().get("version", "")
+    parts = [int(p) for p in ver.split(".")]
+    assert parts >= [0, 1, 4]
 
 
 def test_backtest_get():

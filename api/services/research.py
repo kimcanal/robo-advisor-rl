@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 
-from api.schemas import Citation, ResearchRequest, ResearchResponse, RiskTag
+from api.schemas import Citation, NodeLatency, ResearchRequest, ResearchResponse, RiskTag
 
 
 def pd_ts(value) -> str:
@@ -17,6 +17,7 @@ def run_research(req: ResearchRequest) -> ResearchResponse:
 
     plan: list[str] = []
     node_trace: list[str] = []
+    node_latencies: list[NodeLatency] = []
     citations: list[Citation] = []
     verify_ok = False
     verify_notes: list[str] = []
@@ -35,6 +36,13 @@ def run_research(req: ResearchRequest) -> ResearchResponse:
         excerpt = state.report_excerpt
         plan = list(state.plan)
         node_trace = list(state.node_trace)
+        node_latencies = [
+            NodeLatency(
+                node=str(item.get("node", "")),
+                latency_ms=float(item.get("latency_ms", 0.0)),
+            )
+            for item in (state.node_latencies_ms or [])
+        ]
         verify_ok = bool(state.verify_ok)
         verify_notes = list(state.verify_notes)
         citations = [
@@ -63,6 +71,7 @@ def run_research(req: ResearchRequest) -> ResearchResponse:
         )
         plan = ["fallback: mock_risk_tags only"]
         node_trace = ["fallback"]
+        node_latencies = [NodeLatency(node="fallback", latency_ms=0.0)]
         verify_notes = [f"rag graph unavailable: {exc}"]
 
     tags = [
@@ -82,6 +91,7 @@ def run_research(req: ResearchRequest) -> ResearchResponse:
         stub=True,
         plan=plan,
         node_trace=node_trace,
+        node_latencies_ms=node_latencies,
         citations=citations,
         verify_ok=verify_ok,
         verify_notes=verify_notes,

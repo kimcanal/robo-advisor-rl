@@ -102,3 +102,20 @@ def test_citation_snippet_may_include_tags():
     assert state.verify_ok is True
     # At least one citation should carry a non-empty quote
     assert any((c.quote or c.snippet) for c in state.citations)
+
+
+def test_node_latencies_ms_align_with_trace():
+    state = run_research_graph(
+        query="regulatory outlook",
+        tickers=["SPY", "QQQ"],
+        n_events_per_ticker=1,
+        seed=7,
+        top_k=3,
+    )
+    expected = ["plan", "retrieve", "tag_risk", "verify", "summarize"]
+    assert state.node_trace == expected
+    assert len(state.node_latencies_ms) == len(expected)
+    for item, name in zip(state.node_latencies_ms, expected):
+        assert item["node"] == name
+        assert isinstance(item["latency_ms"], (int, float))
+        assert item["latency_ms"] >= 0.0

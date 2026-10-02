@@ -28,7 +28,21 @@ def test_notion_docs_exist():
         "docs/reward_rationale.md",
         "docs/morning_review.md",
         "docs/notion_submission_map.md",
+        "docs/architecture.md",
         "rag/README.md",
         ".env.example",
     ):
         assert (ROOT / rel).is_file(), rel
+
+
+def test_architecture_mentions_mermaid_and_layers():
+    text = (ROOT / "docs" / "architecture.md").read_text()
+    assert "mermaid" in text
+    assert "Streamlit" in text
+    assert "FastAPI" in text
+    assert "plan" in text and "summarize" in text
+
+
+def test_notion_map_links_architecture():
+    text = (ROOT / "docs" / "notion_submission_map.md").read_text()
+    assert "docs/architecture.md" in text

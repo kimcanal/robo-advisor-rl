@@ -1,9 +1,9 @@
 # Educational convenience targets — not for production trading.
-.PHONY: help test api streamlit compose-up compose-down fmt-check
+.PHONY: help test api streamlit smoke compose-up compose-down fmt-check
 
 help:
-	@echo "Targets: test | api | streamlit | compose-up | compose-down | fmt-check"
-	@echo "Docs: docs/morning_review.md docs/notion_submission_map.md docs/error_analysis.md"
+	@echo "Targets: test | api | streamlit | smoke | compose-up | compose-down | fmt-check"
+	@echo "Docs: docs/architecture.md docs/morning_review.md docs/notion_submission_map.md"
 
 PYTHON ?= .venv/bin/python
 PYTEST ?= .venv/bin/pytest
@@ -15,6 +15,9 @@ test:
 
 api:
 	PYTHONPATH=. $(UVICORN) api.main:app --reload --host 127.0.0.1 --port 8000
+
+smoke:
+	@curl -sf http://127.0.0.1:8000/health | $(PYTHON) -c "import sys,json; d=json.load(sys.stdin); assert d.get('status')=='ok'; print('smoke ok', d.get('version'))"
 
 streamlit:
 	PYTHONPATH=. API_BASE_URL=http://127.0.0.1:8000 $(STREAMLIT) run streamlit_app/app.py

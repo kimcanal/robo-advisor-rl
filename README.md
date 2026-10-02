@@ -119,9 +119,9 @@
 
 | 섹션 | 상태 | 어디에 있나 |
 |---|---|---|
-| **Architecture** | ✅ 문서화 | 위 아키텍처 다이어그램 + 역할 인터페이스 계약 |
+| **Architecture** | ✅ 문서화 | `docs/architecture.md` (mermaid flowchart) + 위 다이어그램 + 역할 인터페이스 계약 |
 | **Reward rationale** | ✅ 문서화 | `docs/reward_rationale.md` + `rl/README.md` (simple / sharpe / mdd_penalty, Safe-Guard, VecNormalize; Colab TODO) |
-| **Docker placeholder** | ✅ 스켈레톤 | `Dockerfile`, `docker-compose.yml` (api healthcheck + streamlit depends_on healthy), `Makefile` (test/api/streamlit/compose/fmt-check) |
+| **Docker placeholder** | ✅ 스켈레톤 | `Dockerfile`, `docker-compose.yml` (api healthcheck + streamlit depends_on healthy), `Makefile` (test/api/streamlit/smoke/compose/fmt-check) |
 | **Metrics** | ✅ 코드 | `rl/backtest.py::compute_metrics` (12지표), API `GET /backtest` |
 | **ANOVA** | ✅ 코드+API | `rl/stats_tests.py` + API `POST /anova` (합성 시리즈 교육용) |
 | **RAG / LangGraph stub** | ✅ 스텁 확장 | `rag/` plan→…→summarize + richer seed corpus + `RAG_TOP_K`/`RAG_STUB_FORCE`/`RAG_COLLECTION` (`.env.example`) — 실 LLM/Chroma ⏳; 응답 `stub: true` |

@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 class HealthResponse(BaseModel):
     status: str = "ok"
     service: str = "robo-advisor-api"
-    version: str = "0.1.3"
+    version: str = "0.1.4"
     educational: bool = True
     disclaimer: str = (
         "Educational demo only — not investment advice; backtests ≠ future returns."
@@ -95,13 +95,27 @@ class Citation(BaseModel):
     quote: str = ""
 
 
+class NodeLatency(BaseModel):
+    """Per-node wall time from the stub graph (educational timings, not SLOs)."""
+
+    node: str
+    latency_ms: float
+
+
 class ResearchResponse(BaseModel):
     query: str
     risk_tags: list[RiskTag]
     report_excerpt: str
     stub: bool = True
     plan: list[str] = Field(default_factory=list)
-    node_trace: list[str] = Field(default_factory=list)
+    node_trace: list[str] = Field(
+        default_factory=list,
+        description="Ordered stub nodes: plan → retrieve → tag_risk → verify → summarize",
+    )
+    node_latencies_ms: list[NodeLatency] = Field(
+        default_factory=list,
+        description="Per-node stub timings matching node_trace order",
+    )
     citations: list[Citation] = Field(default_factory=list)
     verify_ok: bool = False
     verify_notes: list[str] = Field(default_factory=list)

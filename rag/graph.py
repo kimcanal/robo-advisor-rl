@@ -6,6 +6,7 @@ so we avoid LangGraph/LangChain deps until the real stack lands.
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -62,6 +63,7 @@ class ResearchState:
     verify_notes: list[str] = field(default_factory=list)
     report_excerpt: str = ""
     node_trace: list[str] = field(default_factory=list)
+    node_latencies_ms: list[dict[str, Any]] = field(default_factory=list)
     store: InMemoryVectorStore | None = None
 
 
@@ -209,9 +211,16 @@ def node_summarize(state: ResearchState) -> ResearchState:
         cite_bits.append(f"[{i}] {c.doc_id} ({c.ticker}, score={c.score})")
     cites = "; ".join(cite_bits) if cite_bits else "(no citations)"
     verify_flag = "PASS" if state.verify_ok else "FAIL"
+    # node_latencies_ms is filled by run_research_graph after each node;
+    # during summarize itself the list may still be incomplete — omit if empty.
+    lat_bits = []
+    for item in state.node_latencies_ms:
+        lat_bits.append(f"{item.get('node')}={item.get('latency_ms')}ms")
+    lat_note = f" node_latencies=[{', '.join(lat_bits)}];" if lat_bits else ""
     state.report_excerpt = (
         f"[LangGraph-shaped stub plan→retrieve→tag_risk→verify→summarize] "
-        f"query={state.query!r}; nodes={' → '.join(state.node_trace)}; "
+        f"query={state.query!r}; nodes={' → '.join(state.node_trace)};"
+        f"{lat_note} "
         f"docs={n_docs}; risk_events={n_tags}; verify={verify_flag}; "
         f"sample=[{preview}]; citations={cites}. "
         "Risk tags follow rl.risk_tags env contract "
@@ -270,6 +279,9 @@ def run_research_graph(
         top_k=resolved_k,
         store=store,
     )
-    for _name, fn in GRAPH_NODES:
+    for name, fn in GRAPH_NODES:
+        t0 = time.perf_counter()
         state = fn(state)
+        elapsed = round((time.perf_counter() - t0) * 1000.0, 3)
+        state.node_latencies_ms.append({"node": name, "latency_ms": elapsed})
     return state
