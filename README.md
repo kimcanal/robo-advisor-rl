@@ -50,8 +50,9 @@
 ┌─────────────────────────────────────────────┐
 │  임소현: 백엔드·화면                            │
 │  FastAPI (/health /optimize /explain          │
-│           /research /backtest /anova)         │
-│  Streamlit 7탭 (API 통신만, 모델 직접 로드 금지)  │
+│           /research /risk-tags/apply          │
+│           /backtest /anova)                   │
+│  Streamlit 8탭 (API 통신만, 모델 직접 로드 금지)  │
 └─────────────────────────────────────────────┘
 ```
 

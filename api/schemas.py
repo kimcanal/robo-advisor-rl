@@ -156,3 +156,44 @@ class AnovaResponse(BaseModel):
     )
     stub: bool = True
     latency_ms: float | None = None
+
+
+class RiskTagsApplyRequest(BaseModel):
+    """Wire risk tags into a causal panel + optional short PortfolioEnv demo."""
+
+    tickers: list[str] = Field(default_factory=lambda: ["SPY", "QQQ", "TLT"])
+    risk_tags: list[RiskTag] | None = Field(
+        default=None,
+        description="Optional client-supplied tags; if omitted, generated via source.",
+    )
+    source: str = Field(
+        default="mock",
+        description="When risk_tags omitted: 'mock' or 'rag_graph' (stub, no live LLM).",
+    )
+    query: str = Field(default="market risk outlook", min_length=1)
+    n_events_per_ticker: int = Field(default=3, ge=1, le=10)
+    panel_start: str = Field(default="2019-01-01")
+    panel_end: str = Field(default="2020-12-31")
+    run_env_demo: bool = Field(
+        default=True,
+        description="If true, step a short PortfolioEnv on dummy data and sample portfolio_risk.",
+    )
+    env_steps: int = Field(default=8, ge=1, le=40)
+    env_window: int = Field(default=20, ge=5, le=60)
+    seed: int = Field(default=0)
+
+
+class RiskTagsApplyResponse(BaseModel):
+    tickers: list[str]
+    source: str
+    risk_tags: list[RiskTag]
+    panel_summary: dict[str, Any]
+    env_demo: dict[str, Any] | None = None
+    stub: bool = True
+    notes: str = ""
+    env_contract: str = (
+        "risk_tags {ticker, risk_score[0,1], tag, ts} → "
+        "rl.risk_tags.risk_score_panel → PortfolioEnv.portfolio_risk"
+    )
+    latency_ms: float | None = None
+

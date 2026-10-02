@@ -152,3 +152,83 @@ def test_anova_two_way():
     assert body["mode"] == "two_way"
     assert "anova_table" in body["result"]
     assert "eta_squared" in body["result"]
+
+
+def test_risk_tags_apply_mock_with_env():
+    r = client.post(
+        "/risk-tags/apply",
+        json={
+            "tickers": ["SPY", "QQQ"],
+            "source": "mock",
+            "n_events_per_ticker": 2,
+            "panel_start": "2019-01-01",
+            "panel_end": "2020-06-30",
+            "run_env_demo": True,
+            "env_steps": 5,
+            "seed": 3,
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["stub"] is True
+    assert body["source"] == "mock_risk_tags"
+    assert len(body["risk_tags"]) == 4
+    assert body["panel_summary"]["n_tickers"] == 2
+    assert body["panel_summary"]["n_dates"] > 0
+    assert "portfolio_risk" in body.get("env_contract", "")
+    env = body["env_demo"]
+    assert env is not None
+    assert env["n_steps_run"] >= 1
+    assert env["n_risk_obs"] == 1
+    assert len(env["sample_portfolio_risk"]) >= 1
+    assert body.get("latency_ms") is not None
+
+
+def test_risk_tags_apply_client_supplied_no_env():
+    r = client.post(
+        "/risk-tags/apply",
+        json={
+            "tickers": ["SPY", "TLT"],
+            "risk_tags": [
+                {
+                    "ticker": "SPY",
+                    "risk_score": 0.7,
+                    "tag": "geopolitics",
+                    "ts": "2019-06-03",
+                },
+                {
+                    "ticker": "TLT",
+                    "risk_score": 0.2,
+                    "tag": "rates",
+                    "ts": "2019-06-10",
+                },
+            ],
+            "run_env_demo": False,
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["source"] == "client_supplied"
+    assert body["env_demo"] is None
+    assert body["panel_summary"]["nonzero_cells"] > 0
+    assert len(body["risk_tags"]) == 2
+
+
+def test_risk_tags_apply_rag_graph_source():
+    r = client.post(
+        "/risk-tags/apply",
+        json={
+            "tickers": ["QQQ"],
+            "source": "rag_graph",
+            "query": "credit stress",
+            "n_events_per_ticker": 1,
+            "run_env_demo": True,
+            "env_steps": 3,
+            "seed": 1,
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["stub"] is True
+    assert body["source"] in {"rag_graph_stub", "mock_risk_tags"}
+    assert len(body["risk_tags"]) >= 1

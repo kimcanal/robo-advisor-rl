@@ -1,4 +1,4 @@
-"""FastAPI entrypoint — /health /optimize /explain /research /backtest /anova."""
+"""FastAPI entrypoint — /health /optimize /explain /research /risk-tags/apply /backtest /anova."""
 from __future__ import annotations
 
 from fastapi import FastAPI, Query
@@ -15,12 +15,15 @@ from api.schemas import (
     OptimizeResponse,
     ResearchRequest,
     ResearchResponse,
+    RiskTagsApplyRequest,
+    RiskTagsApplyResponse,
 )
 from api.services.anova_svc import run_anova
 from api.services.backtest_svc import run_backtest
 from api.services.explain import run_explain
 from api.services.optimize import run_optimize
 from api.services.research import run_research
+from api.services.risk_apply import run_risk_tags_apply
 
 app = FastAPI(
     title="Robo-Advisor API",
@@ -29,7 +32,7 @@ app = FastAPI(
         "Not investment advice; backtests ≠ future returns. "
         "ANOVA endpoints use synthetic demo series for teaching only. "
         "RAG /research uses plan→retrieve→tag_risk→verify→summarize stub "
-        "with in-memory store + citation placeholders."
+        "with in-memory store + citation placeholders. POST /risk-tags/apply demos causal panel → PortfolioEnv.portfolio_risk."
     ),
     version=__version__,
 )
@@ -86,3 +89,20 @@ def backtest(
 )
 def anova(body: AnovaRequest) -> AnovaResponse:
     return run_anova(body)
+
+
+@app.post(
+    "/risk-tags/apply",
+    response_model=RiskTagsApplyResponse,
+    tags=["research"],
+    summary="Apply risk tags → causal panel + PortfolioEnv.portfolio_risk demo",
+    description=(
+        "Educational wiring stub: accepts optional risk_tags (or mock / rag stub), "
+        "builds a causal risk_score_panel via rl.risk_tags, and optionally steps a "
+        "short PortfolioEnv on dummy data so portfolio_risk appears in observation. "
+        "Not investment advice; no live LLM."
+    ),
+)
+def risk_tags_apply(body: RiskTagsApplyRequest) -> RiskTagsApplyResponse:
+    return run_risk_tags_apply(body)
+

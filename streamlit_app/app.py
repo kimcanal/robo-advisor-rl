@@ -22,9 +22,10 @@ tabs = st.tabs(
         "2. Optimize",
         "3. Explain",
         "4. Research",
-        "5. Backtest",
-        "6. ANOVA",
-        "7. Health / Settings",
+        "5. Risk-tag wiring",
+        "6. Backtest",
+        "7. ANOVA",
+        "8. Health / Settings",
     ]
 )
 
@@ -151,7 +152,78 @@ with tabs[3]:
         except Exception as exc:
             st.error(f"API call failed: {exc}")
 
+
 with tabs[4]:
+    st.subheader("Risk-tag wiring (panel → PortfolioEnv.portfolio_risk)")
+    st.caption(
+        "Educational stub: POST /risk-tags/apply builds a causal risk_score_panel "
+        "and optionally steps a short PortfolioEnv on dummy data. Not investment advice."
+    )
+    tickers_w = st.text_input("tickers", "SPY,QQQ,TLT", key="wire_tickers")
+    source = st.selectbox("source (when no client tags)", ["mock", "rag_graph"], key="wire_src")
+    run_env = st.checkbox("run_env_demo", value=True, key="wire_env")
+    env_steps = st.slider("env_steps", 1, 20, 8, key="wire_steps")
+    if st.button("Run /risk-tags/apply", key="wire"):
+        try:
+            tickers = [t.strip() for t in tickers_w.split(",") if t.strip()]
+            data = _post(
+                "/risk-tags/apply",
+                {
+                    "tickers": tickers,
+                    "source": source,
+                    "run_env_demo": run_env,
+                    "env_steps": int(env_steps),
+                    "n_events_per_ticker": 3,
+                    "seed": 0,
+                },
+            )
+            st.write(
+                f"**source:** `{data.get('source')}` · stub={data.get('stub')} · "
+                f"latency_ms={data.get('latency_ms')}"
+            )
+            st.caption(data.get("env_contract", ""))
+            panel = data.get("panel_summary") or {}
+            if panel:
+                st.markdown("**Panel summary (causal)**")
+                st.json(
+                    {
+                        k: panel[k]
+                        for k in (
+                            "n_dates",
+                            "n_tickers",
+                            "nonzero_cells",
+                            "global_mean",
+                            "global_max",
+                            "date_start",
+                            "date_end",
+                        )
+                        if k in panel
+                    }
+                )
+            tags = data.get("risk_tags") or []
+            if tags:
+                st.markdown("**Risk tags**")
+                st.dataframe(pd.DataFrame(tags))
+            env_demo = data.get("env_demo") or {}
+            if env_demo:
+                st.markdown("**Env demo (portfolio_risk samples)**")
+                st.write(
+                    f"obs_dim={env_demo.get('obs_dim')} · "
+                    f"saw_nonzero_risk={env_demo.get('saw_nonzero_risk')} · "
+                    f"mean={env_demo.get('portfolio_risk_mean')} · "
+                    f"max={env_demo.get('portfolio_risk_max')}"
+                )
+                samples = env_demo.get("sample_portfolio_risk") or []
+                if samples:
+                    st.dataframe(pd.DataFrame(samples))
+            if data.get("notes"):
+                st.caption(data["notes"])
+            with st.expander("raw JSON"):
+                st.json(data)
+        except Exception as exc:
+            st.error(f"API call failed: {exc}")
+
+with tabs[5]:
     st.subheader("Backtest metrics (+ synth SPY/KOSPI)")
     n_days = st.slider("n_days", 60, 504, 252)
     include_benchmark = st.checkbox("include_benchmark", value=True)
@@ -190,7 +262,7 @@ with tabs[4]:
         except Exception as exc:
             st.error(f"API call failed: {exc}")
 
-with tabs[5]:
+with tabs[6]:
     st.subheader("ANOVA (합성 시리즈 · 교육용)")
     st.caption("합성 수익률에 대한 통계 데모입니다. 투자 자문이 아닙니다.")
     mode = st.selectbox("mode", ["one_way", "two_way"])
@@ -206,7 +278,7 @@ with tabs[5]:
         except Exception as exc:
             st.error(f"API call failed: {exc}")
 
-with tabs[6]:
+with tabs[7]:
     st.subheader("Health / Settings")
     st.write(f"`API_BASE_URL` = `{API_BASE}`")
     if st.button("GET /health", key="hlt"):
