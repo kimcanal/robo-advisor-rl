@@ -20,7 +20,7 @@ from stable_baselines3.common.monitor import Monitor
 from .backtest import compute_metrics
 from .config import WINDOW_SIZE
 from .env.portfolio_env import PortfolioEnv
-from .mvo import rolling_mvo_backtest
+from .mvo import equal_weight_backtest, rolling_mvo_backtest
 from .pipeline import prepare_env_inputs
 from .riskfree import fetch_risk_free_rate
 from .shap_explain import build_feature_names, explain_decision
@@ -57,7 +57,7 @@ def main(n_assets=6, window=WINDOW_SIZE, timesteps=8000, test_days=252, tickers=
     for rt in reward_types:
         print(f"\n[demo] === reward={rt} 학습 시작 ({timesteps} steps) ===")
         monitor_path = out_dir / f"monitor_{rt}"
-        train_env_fn = lambda: Monitor(
+        train_env_fn = lambda rt=rt, monitor_path=monitor_path: Monitor(
             PortfolioEnv(
                 returns.iloc[train_slice], rsi_df.iloc[train_slice], macd_df.iloc[train_slice],
                 window=window, reward_type=rt,
@@ -69,7 +69,7 @@ def main(n_assets=6, window=WINDOW_SIZE, timesteps=8000, test_days=252, tickers=
         model.learn(total_timesteps=timesteps)
         _plot_learning_curve(monitor_path, rt)
 
-        test_env_fn = lambda: PortfolioEnv(
+        test_env_fn = lambda rt=rt: PortfolioEnv(
             returns.iloc[test_slice], rsi_df.iloc[test_slice], macd_df.iloc[test_slice],
             window=window, reward_type=rt,
         )
@@ -82,7 +82,7 @@ def main(n_assets=6, window=WINDOW_SIZE, timesteps=8000, test_days=252, tickers=
     # --- 비교 기준: MVO, 동일가중 ---
     test_returns_df = returns.iloc[test_slice].iloc[window:]
     mvo_returns = rolling_mvo_backtest(returns.iloc[: split + test_days]).iloc[-len(test_returns_df):]
-    equal_weight_returns = test_returns_df.mean(axis=1)
+    equal_weight_returns = equal_weight_backtest(test_returns_df)
 
     all_series = {
         **{f"drl_{k}": v.reset_index(drop=True).set_axis(test_returns_df.index[: len(v)]) for k, v in test_returns.items()},

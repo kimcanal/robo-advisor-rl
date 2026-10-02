@@ -4,6 +4,11 @@
 (포트폴리오 로그수익률의 엄밀한 정의가 아니라 자산별 로그수익률의
 가중합으로 근사 — RL 논문/FinRL 등에서 흔히 쓰는 단순화. 리포트에는
 이 근사를 명시할 것).
+
+Compounding: env(`portfolio_env`)와 여기 모두 이 step return을 근사
+로그수익률로 취급한다. 누적/MDD는 exp(cumsum) 경로를 쓰고, env의
+portfolio_value도 np.exp(net_return)으로 복리한다. (1+r) 단순복리와
+혼용하지 말 것.
 """
 from __future__ import annotations
 
