@@ -1,0 +1,14 @@
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  \.venv
+  | rl
+  | colab_run\.ipynb
+)/
+'''
+
+# black scopes formatting to api/, streamlit_app/, rag/, tests/ via CLI paths.
+# Example: black api streamlit_app rag tests

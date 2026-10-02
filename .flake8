@@ -1,0 +1,10 @@
+[flake8]
+max-line-length = 100
+extend-ignore = E501,W503
+exclude =
+    .venv,
+    __pycache__,
+    rl,
+    colab_run.ipynb,
+    .git
+# Scope: run flake8 on api streamlit_app rag tests (RL heavily styled separately; ruff.toml remains primary).

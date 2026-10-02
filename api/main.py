@@ -1,10 +1,12 @@
-"""FastAPI entrypoint — /health /optimize /explain /research /backtest."""
+"""FastAPI entrypoint — /health /optimize /explain /research /backtest /anova."""
 from __future__ import annotations
 
 from fastapi import FastAPI, Query
 
 from api import __version__
 from api.schemas import (
+    AnovaRequest,
+    AnovaResponse,
     BacktestResponse,
     ExplainRequest,
     ExplainResponse,
@@ -14,6 +16,7 @@ from api.schemas import (
     ResearchRequest,
     ResearchResponse,
 )
+from api.services.anova_svc import run_anova
 from api.services.backtest_svc import run_backtest
 from api.services.explain import run_explain
 from api.services.optimize import run_optimize
@@ -23,7 +26,8 @@ app = FastAPI(
     title="Robo-Advisor API",
     description=(
         "Educational skeleton wrapping RL / research modules. "
-        "Not investment advice; backtests ≠ future returns."
+        "Not investment advice; backtests ≠ future returns. "
+        "ANOVA endpoints use synthetic demo series for teaching only."
     ),
     version=__version__,
 )
@@ -56,3 +60,17 @@ def backtest(
     include_benchmark: bool = Query(default=True),
 ) -> BacktestResponse:
     return run_backtest(n_days=n_days, seed=seed, include_benchmark=include_benchmark)
+
+
+@app.post(
+    "/anova",
+    response_model=AnovaResponse,
+    tags=["eval"],
+    summary="Educational ANOVA on synthetic series",
+    description=(
+        "Wraps rl.stats_tests.one_way_anova / two_way_anova on synthetic demo returns. "
+        "Educational only — not investment advice; synthetic data ≠ live markets."
+    ),
+)
+def anova(body: AnovaRequest) -> AnovaResponse:
+    return run_anova(body)

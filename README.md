@@ -50,8 +50,8 @@
 ┌─────────────────────────────────────────────┐
 │  임소현: 백엔드·화면                            │
 │  FastAPI (/health /optimize /explain          │
-│           /research /backtest)                │
-│  Streamlit 6탭 (API 통신만, 모델 직접 로드 금지)  │
+│           /research /backtest /anova)         │
+│  Streamlit 7탭 (API 통신만, 모델 직접 로드 금지)  │
 └─────────────────────────────────────────────┘
 ```
 
@@ -104,8 +104,8 @@
 - ⏳ 동일가중 포트폴리오를 아직 절대수치로는 못 이김 — 원인 추적 중 (관측값에
   drawdown 미포함 등), 과제 스펙의 Why/How 문서화 요구에 맞춰 계속 기록 중
 - ⏳ 데이터팀 실제 수집 파이프라인 대기 중 (연결되면 `rl/data/raw/`에 CSV만 추가)
-- ⏳ 리서치·RAG 리스크 태그 인터페이스 대기 중
-- ✅ FastAPI/Streamlit/Docker 스켈레톤 추가 (`api/`, `streamlit_app/`, `Dockerfile`, `docker-compose.yml`) — 백엔드팀이 확장할 뼈대
+- ✅ 리서치·RAG LangGraph형 스텁 (`rag/`: retrieve→tag_risk→summarize, API `/research` 연동) — 실 LLM/벡터스토어는 ⏳
+- ✅ FastAPI/Streamlit/Docker 스켈레톤 확장 (`api/`, `streamlit_app/`, `rag/`, `Dockerfile`) — CI workflow 초안은 로컬 대기(workflow scope)
 
 ## Notion week-38 submission checklist
 
@@ -117,7 +117,9 @@
 | **Reward rationale** | ✅ 문서화 | `rl/README.md` 설계 근거 (simple / sharpe / mdd_penalty + 출처 표) |
 | **Docker placeholder** | ✅ 스켈레톤 | `Dockerfile`, `docker-compose.yml` (api + streamlit) |
 | **Metrics** | ✅ 코드 | `rl/backtest.py::compute_metrics` (12지표), API `GET /backtest` |
-| **ANOVA** | ✅ 코드 | `rl/stats_tests.py` (one-way / two-way + Tukey HSD) |
+| **ANOVA** | ✅ 코드+API | `rl/stats_tests.py` + API `POST /anova` (합성 시리즈 교육용) |
+| **RAG / LangGraph stub** | ✅ 스텁 | `rag/graph.py` (retrieve→tag_risk→summarize), `/research` 연동 — 실 LLM ⏳ |
+| **CI (GitHub Actions)** | ⏳ 로컬 초안 | `ci.yml` 초안 준비됨 — workflow scope로 푸시 필요 (이 커밋에 미포함) |
 | **Error analysis** | ⏳ 진행 | Walk-Forward·동일가중 미달 원인 추적 (`rl/README` 한계 6–7) |
 | **Financial disclaimer** | ✅ | 아래 고지 + API/Streamlit 캡션 |
 
@@ -137,7 +139,7 @@ API_BASE_URL=http://127.0.0.1:8000 streamlit run streamlit_app/app.py
 docker compose up --build
 ```
 
-Endpoints: `GET /health`, `POST /optimize`, `POST /explain`, `POST /research` (RAG stub), `GET /backtest`.
+Endpoints: `GET /health`, `POST /optimize`, `POST /explain`, `POST /research` (RAG stub), `GET /backtest`, `POST /anova` (합성 ANOVA).
 
 ## Financial disclaimer (필수 고지)
 

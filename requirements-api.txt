@@ -7,3 +7,10 @@ pydantic>=2
 python-dotenv>=1.0
 pytest>=8.0
 ruff>=0.6
+# Optional local formatting (also configured in pyproject.toml / .flake8):
+# black>=24.0
+# flake8>=7.0
+# LangGraph is NOT required for the educational rag/ stub (plain Python state
+# machine named to match LangGraph concepts). When the real RAG stack lands:
+#   langgraph>=0.2
+#   langchain-core>=0.3

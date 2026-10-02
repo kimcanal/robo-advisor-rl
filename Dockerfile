@@ -17,6 +17,7 @@ RUN pip install --upgrade pip \
 
 COPY api /app/api
 COPY rl /app/rl
+COPY rag /app/rag
 COPY streamlit_app /app/streamlit_app
 
 EXPOSE 8000 8501

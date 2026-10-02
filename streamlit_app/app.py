@@ -22,7 +22,8 @@ tabs = st.tabs(
         "3. Explain",
         "4. Research",
         "5. Backtest",
-        "6. Health / Settings",
+        "6. ANOVA",
+        "7. Health / Settings",
     ]
 )
 
@@ -44,10 +45,10 @@ def _post(path: str, payload: dict):
 with tabs[0]:
     st.subheader("Overview (placeholder)")
     st.write(
-        "Six-area shell that only talks to FastAPI. "
+        "Shell that only talks to FastAPI. "
         "Wire real charts once backend endpoints return production payloads."
     )
-    st.info("Architecture: Streamlit → HTTP → FastAPI → rl.* / research stubs")
+    st.info("Architecture: Streamlit → HTTP → FastAPI → rl.* / rag stub")
 
 with tabs[1]:
     st.subheader("Optimize")
@@ -89,6 +90,18 @@ with tabs[4]:
             st.error(f"API call failed: {exc}")
 
 with tabs[5]:
+    st.subheader("ANOVA (합성 시리즈 · 교육용)")
+    st.caption("합성 수익률에 대한 통계 데모입니다. 투자 자문이 아닙니다.")
+    mode = st.selectbox("mode", ["one_way", "two_way"])
+    n_obs = st.slider("n_obs", 30, 500, 120)
+    if st.button("Run /anova", key="anova"):
+        try:
+            data = _post("/anova", {"mode": mode, "n_obs": n_obs, "seed": 0})
+            st.json(data)
+        except Exception as exc:
+            st.error(f"API call failed: {exc}")
+
+with tabs[6]:
     st.subheader("Health / Settings")
     st.write(f"`API_BASE_URL` = `{API_BASE}`")
     if st.button("GET /health", key="hlt"):

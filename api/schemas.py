@@ -85,3 +85,27 @@ class BacktestResponse(BaseModel):
     n_days: int
     method: str
     notes: str = ""
+
+
+class AnovaRequest(BaseModel):
+    """Educational ANOVA on synthetic demo series (no live market data)."""
+
+    mode: str = Field(
+        default="one_way",
+        description="ANOVA mode: 'one_way' (DRL vs MVO vs equal) or 'two_way' (strategy × regime).",
+    )
+    n_obs: int = Field(default=120, ge=30, le=5000, description="Observations per group / total budget")
+    seed: int = Field(default=0, description="RNG seed for reproducible synthetic series")
+
+
+class AnovaResponse(BaseModel):
+    mode: str
+    groups: list[str]
+    n_obs: int
+    result: dict[str, Any]
+    notes: str = (
+        "Educational statistical demo wrapping rl.stats_tests. "
+        "Not investment advice; synthetic data ≠ live markets."
+    )
+    stub: bool = True
+
