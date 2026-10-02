@@ -47,7 +47,7 @@ python -m pytest rl/tests -v
 | `mvo.py` | MVO(Markowitz) 비교 기준, scipy 최적화 |
 | `backtest.py` | 성과 지표 12종, Walk-Forward 윈도우 분할 |
 | `stats_tests.py` | ANOVA(One-way/Two-way) + Tukey HSD — **설명·평가팀 인터페이스** |
-| `regime.py` | 시장 국면(Bull/Flat/Bear) 규칙기반 탐지기(학습 불필요) — 검증3 Two-way ANOVA 국면 라벨용. `~/Dynamic_Regime_Portfolio-luca` 프로젝트의 `ScoreRegimeDetector`를 참고/이식(breadth 조건 제외, 핵심 4개 기술적 조건만) |
+| `regime.py` | 시장 국면(Bull/Flat/Bear) 규칙기반 탐지기(학습 불필요) — 검증3 Two-way ANOVA 국면 라벨용. [Dynamic-Regime-Portfolio](https://github.com/tazooo114/Dynamic-Regime-Portfolio)(MIT) 프로젝트의 `ScoreRegimeDetector`를 참고/이식(breadth 조건 제외, 핵심 4개 기술적 조건만) |
 | `walk_forward.py` | Walk-Forward 백테스트(학습4년→테스트1년, 2윈도우, 재학습) + 일별 국면 라벨로 검증2·검증3 ANOVA까지 실행 |
 | `shap_explain.py` | 정책 의사결정에 대한 SHAP Summary/Force Plot |
 | `run_demo.py` | 위 전부를 잇는 end-to-end 데모 |
@@ -91,8 +91,8 @@ python -m pytest rl/tests -v
 | RSI(14일)/MACD(12,26,9) 파라미터 | 기술적 분석에서 가장 널리 쓰이는 표준 파라미터 (교재/실무 관행) | Wilder, J.W., 1978, "New Concepts in Technical Trading Systems" (RSI); Appel, G. (MACD 창안자) |
 | 거래수수료 0.015%/슬리피지 0.05% | 임의 선택이 아니라 **과제 스펙 4-2에 고정값으로 명시**된 제약 | 과제 스펙 (자체 근거 불필요, "요구사항 준수"가 근거) |
 | lambda(MDD 페널티 강도) 탐색범위 0.5~5.0 | 과제 스펙이 권장 범위로 명시; 실제 단조적 트레이드오프(lambda↑ → 수익률↓, MDD↓)가 나오는지는 `experiments.py::lambda_sweep`으로 검증 | 과제 스펙 4-3 + `rl/outputs/experiments/lambda_sweep.csv`, `lambda_tradeoff.png` |
-| 시장 국면(Bull/Flat/Bear) 판정 방식 | 이동평균(5/20/60일)·VWAP·변동성보정 ROC 4개 기술적 조건의 다수결 — 학습 없이 재현 가능하고 look-ahead 없음(전일까지 데이터만 사용) | 자체 구현이 아니라 참고 프로젝트에서 이식: `Dynamic_Regime_Portfolio-luca/models/score_model.py::ScoreRegimeDetector` (원본은 S&P500 전종목 breadth 조건 포함, 우리는 개별종목 유니버스가 없어 핵심 4개 조건만 이식) |
-| 무위험이자율을 0 대신 실제 단기국채(BIL)로 | 위 참고 프로젝트 CONSTITUTION도 동일 원칙("하드코딩 상수 대신 BIL/SOFR 동적 사용")을 명시 — 두 출처가 같은 결론이라 근거가 탄탄함 | `Dynamic_Regime_Portfolio-luca/docs/CONSTITUTION.md` §5.4 + `rl/riskfree.py` |
+| 시장 국면(Bull/Flat/Bear) 판정 방식 | 이동평균(5/20/60일)·VWAP·변동성보정 ROC 4개 기술적 조건의 다수결 — 학습 없이 재현 가능하고 look-ahead 없음(전일까지 데이터만 사용) | 자체 구현이 아니라 참고 프로젝트에서 이식: [Dynamic-Regime-Portfolio](https://github.com/tazooo114/Dynamic-Regime-Portfolio)(MIT)의 `models/score_model.py::ScoreRegimeDetector` (원본은 S&P500 전종목 breadth 조건 포함, 우리는 개별종목 유니버스가 없어 핵심 4개 조건만 이식) |
+| 무위험이자율을 0 대신 실제 단기국채(BIL)로 | 위 참고 프로젝트 CONSTITUTION도 동일 원칙("하드코딩 상수 대신 BIL/SOFR 동적 사용")을 명시 — 두 출처가 같은 결론이라 근거가 탄탄함 | [Dynamic-Regime-Portfolio](https://github.com/tazooo114/Dynamic-Regime-Portfolio)의 `docs/CONSTITUTION.md` §5.4 + `rl/riskfree.py` |
 
 ### 국면 탐지기(`regime.py`) 검증
 
@@ -109,7 +109,7 @@ python -m pytest rl/tests -v
 
 ### 코드 감사 이력 (참고 프로젝트 교차검증)
 
-`Dynamic_Regime_Portfolio-luca`의 자체 코드 감사 문서(`Code Weakness.md`)에 나온
+[Dynamic-Regime-Portfolio](https://github.com/tazooo114/Dynamic-Regime-Portfolio)의 자체 코드 감사 문서(`Code Weakness.md`)에 나온
 패턴들을 우리 코드에도 있는지 하나씩 대조해봄:
 
 | 패턴 | 우리 코드 상태 | 조치 |

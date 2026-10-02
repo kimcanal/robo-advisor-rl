@@ -1,7 +1,7 @@
 """시장 국면(Bull/Flat/Bear) 규칙 기반 진단기 — ANOVA 검증3용 (요구사항 4-8).
 
-출처: `~/Dynamic_Regime_Portfolio-luca/models/score_model.py`의
-`ScoreRegimeDetector`를 참고/이식. 원본은 S&P500 전종목의 상승비율(breadth)
+출처: https://github.com/tazooo114/Dynamic-Regime-Portfolio (MIT License)의
+`models/score_model.py::ScoreRegimeDetector`를 참고/이식. 원본은 S&P500 전종목의 상승비율(breadth)
 조건까지 포함하지만, 우리는 개별종목 유니버스 데이터가 없어 **학습이
 필요 없는 핵심 4개 기술적 조건**(VWAP, 이동평균 5/20/60, 변동성보정 ROC)만
 가져왔다. 학습이 필요 없는 규칙 기반이라 파이프라인에 바로 꽂을 수 있고,

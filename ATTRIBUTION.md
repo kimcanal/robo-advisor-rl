@@ -2,10 +2,12 @@
 
 ## 개요
 
-강화학습(RL) 모듈 개발 중, 동료(영환/luca)가 공유해준 참고 프로젝트
-(`Dynamic Regime Portfolio`)를 **일부 로직 이식 + 코드 자가검증 도구**로
-활용했습니다. 핵심 RL 파이프라인(환경·보상·PPO 학습)은 전부 자체 구현이며,
-아래 두 가지만 외부 참고를 거쳤습니다.
+강화학습(RL) 모듈 개발 중, 동료(영환, GitHub `tazooo114`)의 공개 프로젝트
+[`Dynamic-Regime-Portfolio`](https://github.com/tazooo114/Dynamic-Regime-Portfolio)
+(**MIT License**)를 **일부 로직 이식 + 코드 자가검증 도구**로 활용했습니다.
+본인에게 자유롭게 사용해도 좋다는 확인도 직접 받았습니다. 핵심 RL
+파이프라인(환경·보상·PPO 학습)은 전부 자체 구현이며, 아래 두 가지만 외부
+참고를 거쳤습니다.
 
 ## 참고한 것 / 안 한 것
 
@@ -16,11 +18,12 @@
 
 **출처 표기 문구** (리포트/Notion에 그대로 사용):
 
-> 시장 국면 탐지 로직은 동료(영환, Dynamic Regime Portfolio 프로젝트)의
-> 규칙기반 Score 모델을 간소화해서 이식했습니다 (출처 명시, 핵심 RL
-> 파이프라인은 자체 구현).
+> 시장 국면 탐지 로직은 동료(영환)의 공개 프로젝트
+> [Dynamic-Regime-Portfolio](https://github.com/tazooo114/Dynamic-Regime-Portfolio)
+> (MIT License, 본인 사용 허락 확인)의 규칙기반 Score 모델을 간소화해서
+> 이식했습니다. 핵심 RL 파이프라인은 자체 구현입니다.
 
-실제 구현: [`rl/regime.py`](rl/regime.py)
+실제 구현: [`rl/regime.py`](rl/regime.py) · 라이선스: [MIT](https://github.com/tazooo114/Dynamic-Regime-Portfolio/blob/main/LICENSE)
 
 ## 코드 감사로 발견·수정한 버그 3개
 
