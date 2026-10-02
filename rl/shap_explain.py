@@ -18,7 +18,7 @@ import numpy as np
 import shap
 
 
-def build_feature_names(tickers: list[str], window: int) -> list[str]:
+def build_feature_names(tickers: list[str], window: int, *, include_risk: bool = True) -> list[str]:
     names = []
     for k in range(window, 0, -1):
         for t in tickers:
@@ -26,6 +26,9 @@ def build_feature_names(tickers: list[str], window: int) -> list[str]:
     names += [f"weight_{t}" for t in tickers]
     names += [f"rsi_{t}" for t in tickers]
     names += [f"macd_{t}" for t in tickers]
+    # PortfolioEnv 관측 끝의 리스크 축 (보유 비중 가중 평균 risk_score)
+    if include_risk:
+        names.append("portfolio_risk")
     return names
 
 

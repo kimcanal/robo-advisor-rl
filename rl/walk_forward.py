@@ -15,6 +15,12 @@ import pandas as pd
 from stable_baselines3 import PPO
 
 from .backtest import compute_metrics, walk_forward_windows
+from .benchmarks import (
+    BenchmarkDownloadError,
+    align_benchmark_returns,
+    load_market_benchmarks,
+    synthetic_benchmark_returns,
+)
 from .config import WINDOW_SIZE
 from .env.portfolio_env import PortfolioEnv
 from .mvo import equal_weight_backtest, rolling_mvo_backtest
@@ -27,6 +33,25 @@ from .vecnorm import make_eval_vecnorm, make_train_vecnorm, rollout_vecnorm
 OUT_DIR = Path(__file__).parent / "outputs" / "walk_forward"
 REAL_TICKERS = ["SPY", "QQQ", "IWM", "EFA", "EEM", "AGG", "TLT", "HYG", "GLD", "VNQ"]
 SPY_OHLCV_PATH = Path(__file__).parent / "data" / "raw" / "SPY_ohlcv.csv"
+
+
+def _load_benchmarks_for_run(start: str, end: str, use_dummy: bool) -> dict:
+    """S&P500(SPY) + KOSPI 로그수익률.
+
+    로컬 CSV → yfinance 순. 실패 시: 실데이터 모드면 예외, 더미 모드면 합성 폴백.
+    """
+    try:
+        return load_market_benchmarks(start, end, allow_download=True)
+    except BenchmarkDownloadError as e:
+        if not use_dummy:
+            raise
+        print(f"[walk_forward] 벤치마크 로드 실패 → 합성 시계열 폴백 ({e})")
+        idx = pd.bdate_range(start, end)
+        return {
+            "spy": synthetic_benchmark_returns(idx, mu=0.00035, sigma=0.01, seed=1, name="spy"),
+            "kospi": synthetic_benchmark_returns(idx, mu=0.00025, sigma=0.012, seed=2, name="kospi"),
+        }
+
 
 
 def _build_daily_regime(returns_df: pd.DataFrame) -> pd.Series:
@@ -59,6 +84,9 @@ def run(
 
     risk_free = fetch_risk_free_rate(start, end) if not use_dummy else 0.0
     print(f"[walk_forward] risk_free_rate={risk_free:.4f} (연율화, BIL 기준)")
+
+    market_benchmarks = _load_benchmarks_for_run(start, end, use_dummy=use_dummy)
+    print(f"[walk_forward] market benchmarks loaded: {list(market_benchmarks)}")
 
     windows = walk_forward_windows(returns.index, train_years=train_years, test_years=test_years, n_windows=n_windows)
     if not windows:
@@ -107,11 +135,13 @@ def run(
                 )
                 eval_venv = make_eval_vecnorm(test_env_fn, train_venv)
                 rets, _ = rollout_vecnorm(model, eval_venv)
-                metrics = compute_metrics(pd.Series(rets), risk_free=risk_free)
+                dates = test_dates_no_buffer[: len(rets)]
+                rets_s = pd.Series(rets, index=dates)
+                spy_aligned = align_benchmark_returns(market_benchmarks["spy"], dates)
+                metrics = compute_metrics(rets_s, benchmark=spy_aligned, risk_free=risk_free)
                 rows.append({"window": w_idx + 1, "strategy": f"drl_{rt}", "seed": seed, **metrics})
                 print(f"[walk_forward] window{w_idx+1} {rt} seed{seed} -> return={metrics['cumulative_return']:.4f}, mdd={metrics['mdd']:.4f}")
 
-                dates = test_dates_no_buffer[: len(rets)]
                 for d, r in zip(dates, rets):
                     daily_rows.append({"window": w_idx + 1, "strategy": f"drl_{rt}", "seed": seed, "date": d, "daily_return": r, "regime": daily_regime.loc[d]})
 
@@ -120,12 +150,27 @@ def run(
         combined_for_mvo = pd.concat([train_returns, test_returns.iloc[window:]])
         mvo_ret = rolling_mvo_backtest(combined_for_mvo).iloc[-len(test_returns.iloc[window:]):]
         equal_ret = equal_weight_backtest(test_returns.iloc[window:])
-        for name, series in [("mvo", mvo_ret), ("equal_weight", equal_ret)]:
-            metrics = compute_metrics(series, risk_free=risk_free)
+        test_idx = test_returns.iloc[window:].index
+        spy_ret = align_benchmark_returns(market_benchmarks["spy"], test_idx).dropna()
+        kospi_ret = align_benchmark_returns(market_benchmarks["kospi"], test_idx).dropna()
+        # 12-metric comparison vs DRL: EW/MVO + market benchmarks (S&P500, KOSPI)
+        baselines = [
+            ("mvo", mvo_ret),
+            ("equal_weight", equal_ret),
+            ("spy", spy_ret),
+            ("kospi", kospi_ret),
+        ]
+        for name, series in baselines:
+            if len(series) == 0:
+                print(f"[walk_forward] window{w_idx+1} {name} -> SKIP (no overlapping dates)")
+                continue
+            bench_for_alpha = spy_ret if name not in ("spy",) else None
+            metrics = compute_metrics(series, benchmark=bench_for_alpha, risk_free=risk_free)
             rows.append({"window": w_idx + 1, "strategy": name, "seed": None, **metrics})
             print(f"[walk_forward] window{w_idx+1} {name} -> return={metrics['cumulative_return']:.4f}, mdd={metrics['mdd']:.4f}")
             for d, r in series.items():
-                daily_rows.append({"window": w_idx + 1, "strategy": name, "seed": None, "date": d, "daily_return": r, "regime": daily_regime.loc[d]})
+                if d in daily_regime.index:
+                    daily_rows.append({"window": w_idx + 1, "strategy": name, "seed": None, "date": d, "daily_return": r, "regime": daily_regime.loc[d]})
 
         _save_incremental(rows, daily_rows)
 

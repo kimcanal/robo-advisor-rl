@@ -41,7 +41,9 @@ python -m pytest rl/tests -v
 | `data/fetch_real_data.py` | yfinance로 실제 ETF 10종(SPY/QQQ/IWM/EFA/EEM/AGG/TLT/HYG/GLD/VNQ) 5년+ 데이터를 받아 `data/raw/`에 저장 — 조윤상님 정식 파이프라인 전 **임시 실데이터 검증용** |
 | `features.py` | 로그수익률, Z-score 정규화, RSI, MACD |
 | `pipeline.py` | 위 조각들을 합쳐 env 입력(수익률/RSI/MACD, 인덱스 정렬)으로 조립 |
-| `env/portfolio_env.py` | Gymnasium 커스텀 환경 (관측/행동 공간, Safe-Guard) |
+| `env/portfolio_env.py` | Gymnasium 커스텀 환경 (관측/행동 공간, Safe-Guard, 리스크 태그 축) |
+| `risk_tags.py` | RAG 리스크 태그 스키마 `{ticker, risk_score, tag, ts}` 로드/목업 → 관측 패널 |
+| `benchmarks.py` | S&P500(SPY/^GSPC) + KOSPI(^KS11) 벤치마크 로드 (yfinance, CSV 폴백) |
 | `rewards.py` | 보상 함수 3종 (simple / sharpe / mdd_penalty) |
 | `train.py` | PPO 단일 학습 스크립트 (모델 + 학습곡선 저장) |
 | `mvo.py` | MVO(Markowitz) 비교 기준, scipy 최적화 |
@@ -58,7 +60,8 @@ python -m pytest rl/tests -v
 - **행동 공간**: 연속값 벡터에 softmax를 씌워 비중으로 변환 (합=1, 공매도 불가).
   이산적 리밸런싱 대신 연속을 택한 이유는 자산이 10개 이상일 때 이산 행동 공간이
   조합 폭발하기 때문.
-- **관측 공간**: 과거 `window`일 로그수익률 + 현재 비중 + RSI + MACD 히스토그램.
+- **관측 공간**: 과거 `window`일 로그수익률 + 현재 비중 + RSI + MACD 히스토그램
+  + **portfolio_risk**(보유 비중 가중 평균 risk_score; 태그 없으면 0).
   window는 기본 30일(요구 범위 20~60 내), 시퀀스를 그대로 펼쳐 MLP에 입력
   (LSTM/Transformer는 스코프 밖으로 미룸).
 - **보상 3종**: `simple`(대조군) / `sharpe`(변동성 페널티) / `mdd_penalty`(누적낙폭
@@ -153,8 +156,8 @@ python -m rl.experiments --which window --timesteps 15000
    yfinance 데이터가 임시로 들어가 있음 — **yfinance는 비상업적 목적만 허용**이라
    `data/raw/*.csv`는 `.gitignore`로 제외해 리포지토리에는 올리지 않음(라이선스 준수).
    정식 데이터는 조윤상님 파이프라인 결과로 교체할 것.
-5. 리스크 태그(RAG팀) 연동: 아직 관측 공간에 반영 안 함. 인터페이스 오면
-   `env/portfolio_env.py`의 관측 공간에 축 하나 추가.
+5. 리스크 태그(RAG팀) 연동: `risk_tags.py` 스키마 + 관측 축(`portfolio_risk`) 스텁 반영.
+   실제 RAG 이벤트가 오면 `data/raw/risk_tags_mock.csv` 형식 CSV만 교체하면 됨.
 6. 관측 공간에 "현재 낙폭(drawdown)"이 빠져있음. mdd_penalty 보상이 낙폭에
    페널티를 주는데 정작 에이전트는 자기 낙폭 상태를 직접 볼 수 없어서, Safe-Guard를
    피하라고 학습시키기 어려운 구조적 한계로 보임 — 다음 개선 후보.

@@ -66,11 +66,10 @@
    `.gitignore`로 제외되어 있어 리포지토리를 받아도 각자 다시 받아야 합니다.)
 
 2. **리서치·RAG팀 → 강화학습팀**
-   위험 이벤트를 `{ticker, risk_score(0~1), tag, timestamp}` 형태로 넘겨주면,
-   강화학습 환경의 관측 공간에 리스크 피처로 추가하거나 Safe-Guard 임계값을
-   동적으로 조정하는 데 사용할 계획입니다. (현재 RL 모듈은 이 필드가 없어도
-   동작하도록 만들어졌고, 인터페이스가 오면 `env/portfolio_env.py`의 관측 공간에
-   한 축만 추가하면 됩니다.)
+   위험 이벤트를 `{ticker, risk_score(0~1), tag, ts}` 형태로 넘기면
+   (`rl/risk_tags.py` 스키마, CSV도 동일), `PortfolioEnv` 관측 끝의
+   `portfolio_risk`(보유 비중 가중 평균) 축에 반영된다. 태그가 없으면 0.0.
+   선택적으로 `risk_mdd_scale`으로 Safe-Guard MDD 한도를 위험도에 비례해 조일 수 있다.
 
 3. **강화학습팀 → 설명·평가팀**
    `rl/backtest.py`의 `compute_metrics()`가 반환하는 12개 지표 dict와,
