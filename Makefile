@@ -1,5 +1,9 @@
 # Educational convenience targets — not for production trading.
-.PHONY: test api streamlit compose-up compose-down fmt-check
+.PHONY: help test api streamlit compose-up compose-down fmt-check
+
+help:
+	@echo "Targets: test | api | streamlit | compose-up | compose-down | fmt-check"
+	@echo "Docs: docs/morning_review.md docs/notion_submission_map.md docs/error_analysis.md"
 
 PYTHON ?= .venv/bin/python
 PYTEST ?= .venv/bin/pytest

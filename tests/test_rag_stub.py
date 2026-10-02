@@ -64,9 +64,9 @@ def test_citations_have_placeholder_quote():
 def test_seed_corpus_covers_extra_tickers():
     store = InMemoryVectorStore()
     tickers = {str(d.get("ticker", "")).upper() for d in store._docs}
-    for t in ("BIL", "VNQ", "SPY", "QQQ"):
+    for t in ("BIL", "VNQ", "SPY", "QQQ", "IWM", "EFA"):
         assert t in tickers
-    assert store.count() >= 10
+    assert store.count() >= 12
 
 
 def test_rag_top_k_env(monkeypatch):

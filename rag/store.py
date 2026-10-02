@@ -148,6 +148,28 @@ _SEED_DOCS: list[dict[str, Any]] = [
         "source": "stub://corpus/regulatory-qqq",
         "tags": ["regulatory", "earnings"],
     },
+    {
+        "doc_id": "stub-iwm-liquidity-01",
+        "ticker": "IWM",
+        "title": "Small-cap liquidity stub",
+        "text": (
+            "IWM Russell 2000 ETF is more sensitive to liquidity and credit conditions "
+            "than mega-cap baskets; educational stub for small-cap risk tagging."
+        ),
+        "source": "stub://corpus/iwm",
+        "tags": ["liquidity", "credit"],
+    },
+    {
+        "doc_id": "stub-efa-geopolitics-01",
+        "ticker": "EFA",
+        "title": "Developed ex-US geopolitics stub",
+        "text": (
+            "EFA developed-market equities ex-US react to geopolitics and FX; stub "
+            "snippet so the demo corpus covers the full ETF universe tickers."
+        ),
+        "source": "stub://corpus/efa",
+        "tags": ["geopolitics", "regulatory"],
+    },
 ]
 
 

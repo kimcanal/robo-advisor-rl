@@ -77,3 +77,8 @@ zip (`rl/train.py` prints the vecnorm path).
 - 백테스트·시뮬레이션은 과거 또는 합성 데이터에 기반하며 **미래 수익을 보장하지 않습니다**.
 - 거래비용·슬리피지·유동성·세금 등이 단순화되어 있을 수 있습니다.
 - API / Docker / `.env.example`는 로컬 실험용이며 라이브 브로커는 기본 비활성입니다.
+
+## Related: error analysis
+
+When DRL lags equal-weight on Walk-Forward, use the hypothesis checklist in
+`docs/error_analysis.md` (H1–H8). Do not invent Colab metrics.
