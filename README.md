@@ -120,8 +120,8 @@
 | 섹션 | 상태 | 어디에 있나 |
 |---|---|---|
 | **Architecture** | ✅ 문서화 | 위 아키텍처 다이어그램 + 역할 인터페이스 계약 |
-| **Reward rationale** | ✅ 문서화 | `rl/README.md` 설계 근거 (simple / sharpe / mdd_penalty + 출처 표) |
-| **Docker placeholder** | ✅ 스켈레톤 | `Dockerfile`, `docker-compose.yml` (api + streamlit) |
+| **Reward rationale** | ✅ 문서화 | `docs/reward_rationale.md` + `rl/README.md` (simple / sharpe / mdd_penalty, Safe-Guard, VecNormalize; Colab TODO) |
+| **Docker placeholder** | ✅ 스켈레톤 | `Dockerfile`, `docker-compose.yml` (api healthcheck + streamlit depends_on healthy), `Makefile` (test/api/streamlit/compose/fmt-check) |
 | **Metrics** | ✅ 코드 | `rl/backtest.py::compute_metrics` (12지표), API `GET /backtest` |
 | **ANOVA** | ✅ 코드+API | `rl/stats_tests.py` + API `POST /anova` (합성 시리즈 교육용) |
 | **RAG / LangGraph stub** | ✅ 스텁 확장 | `rag/graph.py` (plan→retrieve→tag_risk→verify→summarize) + `rag/store.py` (in-memory Chroma-lite) + citations — 실 LLM/Chroma ⏳ |
@@ -137,14 +137,11 @@
 source .venv/bin/activate
 pip install -r rl/requirements.txt -r requirements-api.txt
 
-# API (Swagger: http://127.0.0.1:8000/docs)
-uvicorn api.main:app --reload --port 8000
-
-# Streamlit (API만 호출, 모델 직접 로드 금지)
-API_BASE_URL=http://127.0.0.1:8000 streamlit run streamlit_app/app.py
-
-# Docker
-docker compose up --build
+# Convenience (optional)
+make test
+make api          # Swagger: http://127.0.0.1:8000/docs
+make streamlit    # API만 호출, 모델 직접 로드 금지
+make compose-up   # api healthcheck + streamlit
 ```
 
 Endpoints: `GET /health`, `POST /optimize`, `POST /explain` (artifact JSON or clear stub), `POST /research` (RAG plan/verify + citations), `POST /risk-tags/apply` (panel + env obs wiring), `GET /backtest` (synth SPY/KOSPI + latency_ms), `POST /anova` (합성 ANOVA).

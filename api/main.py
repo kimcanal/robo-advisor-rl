@@ -40,7 +40,14 @@ app = FastAPI(
 
 @app.get("/health", response_model=HealthResponse, tags=["ops"])
 def health() -> HealthResponse:
-    return HealthResponse(version=__version__)
+    """Liveness probe used by Docker healthcheck and Streamlit Health tab."""
+    return HealthResponse(
+        version=__version__,
+        educational=True,
+        disclaimer=(
+            "Educational demo only — not investment advice; backtests ≠ future returns."
+        ),
+    )
 
 
 @app.post("/optimize", response_model=OptimizeResponse, tags=["portfolio"])

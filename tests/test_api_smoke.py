@@ -17,6 +17,8 @@ def test_health():
     assert body["status"] == "ok"
     assert body["service"] == "robo-advisor-api"
     assert "version" in body
+    assert body.get("educational") is True
+    assert "not investment advice" in body.get("disclaimer", "").lower()
 
 
 def test_optimize_equal():

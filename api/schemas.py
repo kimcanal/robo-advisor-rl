@@ -9,7 +9,11 @@ from pydantic import BaseModel, Field
 class HealthResponse(BaseModel):
     status: str = "ok"
     service: str = "robo-advisor-api"
-    version: str = "0.1.1"
+    version: str = "0.1.2"
+    educational: bool = True
+    disclaimer: str = (
+        "Educational demo only — not investment advice; backtests ≠ future returns."
+    )
 
 
 class OptimizeRequest(BaseModel):
