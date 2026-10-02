@@ -261,3 +261,8 @@ make streamlit     # http://127.0.0.1:8501
 Colab: open `colab_run.ipynb` from **master** (includes KS11 soft-fail after PR#5); run Setup → Data → Walk-Forward; download CSVs; fill performance targets — **do not invent numbers**.
 
 `TODO`: pin commit SHA used for the graded Colab run.
+
+## Appendix D — Error-analysis hypothesis index (~0.5–1 p)
+
+Copy the H1–H8 table from `docs/error_analysis.md`. Leave confirm/reject blank until Colab WF CSVs exist. Point graders at the CSV read-out order (§3 of that doc).
+
