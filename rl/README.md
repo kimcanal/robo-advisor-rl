@@ -177,7 +177,7 @@ python -m rl.experiments --which window --timesteps 15000
 | Reward rationale | 「설계 근거」「설계 근거 및 출처」표 — 보상 3종·Safe-Guard·수수료 |
 | Metrics | `backtest.compute_metrics` 12지표; Walk-Forward는 `walk_forward.py` |
 | ANOVA | `stats_tests.py` + `run_demo` / Walk-Forward 검증2·3 |
-| Error analysis | 「알려진 한계 / TODO」및 코드 감사 이력 표 |
+| Error analysis | `docs/error_analysis.md` (H1–H8) + 「알려진 한계 / TODO」및 코드 감사 이력 표 |
 | Docker | 루트 `Dockerfile`이 `rl/`을 이미지에 포함 (학습 이미지 최적화는 TODO) |
 
 ### Financial disclaimer (RL)

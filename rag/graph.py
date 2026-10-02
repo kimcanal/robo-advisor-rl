@@ -5,6 +5,7 @@ so we avoid LangGraph/LangChain deps until the real stack lands.
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -101,18 +102,28 @@ def node_retrieve(state: ResearchState) -> ResearchState:
                 }
             )
     state.retrieved_docs = hits
-    state.citations = [
-        Citation(
-            doc_id=str(h.get("doc_id", "")),
-            title=str(h.get("title", "")),
-            source=str(h.get("source", "")),
-            ticker=str(h.get("ticker", "")),
-            score=float(h.get("score", 0.0)),
-            snippet=str(h.get("snippet") or h.get("text", ""))[:240],
-            quote=str(h.get("snippet") or h.get("text", ""))[:120],
+    state.citations = []
+    for h in hits[: state.top_k]:
+        body = str(h.get("snippet") or h.get("text", "")).strip()
+        # Prefer a short quote that still mentions the ticker when possible.
+        quote = body[:120]
+        tick = str(h.get("ticker", "")).upper()
+        if tick and tick in body.upper():
+            idx = body.upper().find(tick)
+            quote = body[max(0, idx - 20) : max(0, idx - 20) + 120]
+        tags = h.get("tags") or []
+        tag_note = f" [tags={','.join(map(str, tags))}]" if tags else ""
+        state.citations.append(
+            Citation(
+                doc_id=str(h.get("doc_id", "")),
+                title=str(h.get("title", "")),
+                source=str(h.get("source", "")),
+                ticker=str(h.get("ticker", "")),
+                score=float(h.get("score", 0.0)),
+                snippet=(body[:240] + tag_note)[:280],
+                quote=quote.strip() or body[:120],
+            )
         )
-        for h in hits[: state.top_k]
-    ]
     return state
 
 
@@ -220,22 +231,43 @@ GRAPH_NODES: list[tuple[str, NodeFn]] = [
 ]
 
 
+def _env_top_k(default: int = 5) -> int:
+    raw = os.environ.get("RAG_TOP_K", "").strip()
+    if not raw:
+        return default
+    try:
+        return max(1, min(20, int(raw)))
+    except ValueError:
+        return default
+
+
 def run_research_graph(
     query: str,
     tickers: list[str],
     *,
     n_events_per_ticker: int = 3,
     seed: int = 0,
-    top_k: int = 5,
+    top_k: int | None = None,
     store: InMemoryVectorStore | None = None,
 ) -> ResearchState:
-    """Run the stub graph and return the final state."""
+    """Run the stub graph and return the final state.
+
+    Env flags (optional, documented in ``rag/README.md`` / ``.env.example``):
+
+    - ``RAG_TOP_K``: override default top_k (1–20) when ``top_k`` arg is None.
+    - ``RAG_STUB_FORCE``: if truthy (``1``/``true``/``yes``), keep stub behaviour
+      even when LLM keys are present (always true today — no live LLM path yet).
+    - ``RAG_COLLECTION``: in-memory collection name (see ``rag.store``).
+    """
+    # RAG_STUB_FORCE is informational until a live LLM backend lands; always stub.
+    _ = os.environ.get("RAG_STUB_FORCE", "1")
+    resolved_k = _env_top_k(5) if top_k is None else top_k
     state = ResearchState(
         query=query,
         tickers=list(tickers) or ["SPY"],
         n_events_per_ticker=n_events_per_ticker,
         seed=seed,
-        top_k=top_k,
+        top_k=resolved_k,
         store=store,
     )
     for _name, fn in GRAPH_NODES:

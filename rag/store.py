@@ -104,6 +104,50 @@ _SEED_DOCS: list[dict[str, Any]] = [
         "source": "stub://corpus/gld",
         "tags": ["geopolitics", "macro"],
     },
+    {
+        "doc_id": "stub-bil-liquidity-01",
+        "ticker": "BIL",
+        "title": "T-bill ETF liquidity stub",
+        "text": (
+            "BIL short Treasury ETF used as a cash / risk-free proxy; educational stub "
+            "for liquidity and rates narratives when risk-off flows hit equities."
+        ),
+        "source": "stub://corpus/bil",
+        "tags": ["liquidity", "rates"],
+    },
+    {
+        "doc_id": "stub-vnq-regulatory-01",
+        "ticker": "VNQ",
+        "title": "REIT regulatory and rate sensitivity",
+        "text": (
+            "VNQ real-estate ETF reacts to regulatory shifts and duration; stub snippet "
+            "for regulatory risk tagging in the RAG demo corpus."
+        ),
+        "source": "stub://corpus/vnq",
+        "tags": ["regulatory", "rates"],
+    },
+    {
+        "doc_id": "stub-spy-earnings-01",
+        "ticker": "SPY",
+        "title": "Broad-market earnings season stub",
+        "text": (
+            "SPY tracks aggregated mega-cap earnings surprises; stub document so "
+            "citation coverage includes earnings tags for the broad market ETF."
+        ),
+        "source": "stub://corpus/earnings-spy",
+        "tags": ["earnings", "volatility"],
+    },
+    {
+        "doc_id": "stub-qqq-regulatory-01",
+        "ticker": "QQQ",
+        "title": "Tech regulatory scrutiny stub",
+        "text": (
+            "QQQ faces regulatory headlines around competition and data privacy; "
+            "educational corpus entry for regulatory risk_score demos."
+        ),
+        "source": "stub://corpus/regulatory-qqq",
+        "tags": ["regulatory", "earnings"],
+    },
 ]
 
 
@@ -203,7 +247,18 @@ _DEFAULT_STORE: InMemoryVectorStore | None = None
 
 
 def get_default_store() -> InMemoryVectorStore:
+    """Return process-wide store; collection_name from ``RAG_COLLECTION`` if set."""
+    import os
+
     global _DEFAULT_STORE
-    if _DEFAULT_STORE is None:
-        _DEFAULT_STORE = InMemoryVectorStore()
+    name = (os.environ.get("RAG_COLLECTION") or "robo_advisor_stub").strip() or "robo_advisor_stub"
+    if _DEFAULT_STORE is None or _DEFAULT_STORE.collection_name != name:
+        _DEFAULT_STORE = InMemoryVectorStore(collection_name=name)
     return _DEFAULT_STORE
+
+
+def reset_default_store() -> InMemoryVectorStore:
+    """Drop singleton (tests / env flag changes)."""
+    global _DEFAULT_STORE
+    _DEFAULT_STORE = None
+    return get_default_store()

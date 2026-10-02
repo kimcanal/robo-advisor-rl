@@ -59,3 +59,46 @@ def test_citations_have_placeholder_quote():
     assert c0.doc_id
     assert c0.source
     assert c0.quote or c0.snippet
+
+
+def test_seed_corpus_covers_extra_tickers():
+    store = InMemoryVectorStore()
+    tickers = {str(d.get("ticker", "")).upper() for d in store._docs}
+    for t in ("BIL", "VNQ", "SPY", "QQQ"):
+        assert t in tickers
+    assert store.count() >= 10
+
+
+def test_rag_top_k_env(monkeypatch):
+    monkeypatch.setenv("RAG_TOP_K", "2")
+    state = run_research_graph(
+        query="liquidity",
+        tickers=["SPY"],
+        n_events_per_ticker=1,
+        seed=0,
+        top_k=None,
+    )
+    assert state.top_k == 2
+    assert len(state.citations) <= 2
+
+
+def test_rag_collection_env(monkeypatch):
+    from rag.store import reset_default_store
+
+    monkeypatch.setenv("RAG_COLLECTION", "week38_demo")
+    store = reset_default_store()
+    assert store.collection_name == "week38_demo"
+    assert store.count() >= 8
+
+
+def test_citation_snippet_may_include_tags():
+    state = run_research_graph(
+        query="liquidity stress",
+        tickers=["SPY"],
+        n_events_per_ticker=1,
+        seed=2,
+        top_k=3,
+    )
+    assert state.verify_ok is True
+    # At least one citation should carry a non-empty quote
+    assert any((c.quote or c.snippet) for c in state.citations)

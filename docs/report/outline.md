@@ -4,6 +4,28 @@
 > Fill each section for Notion → PDF export (~20 pages). Placeholders marked `TODO`.
 > **Never invent Colab / SHAP / ANOVA live metrics** — paste from Colab CSVs only.
 
+### Page budget & plug-in map (~20 pages)
+
+| § | Section | Target pages | ~words | Figures / tables (placeholders) | Colab / code plug-in |
+|---|---|---|---|---|---|
+| 1 | Title & team | 0.5–1 | 150–300 | — | — |
+| 2 | Problem & motivation | 1–1.5 | 400–600 | Fig: dual-axis mission sketch | Notion charter quotes |
+| 3 | Related work | 1.5–2 | 600–800 | Table: citation map (already drafted) | Bibliography 8–12 |
+| 4 | Architecture | 1.5–2 | 500–700 | Fig: pipeline diagram; Table: API endpoints | Swagger / Streamlit screenshots |
+| 5 | Data & features | 1.5–2 | 500–700 | Table: universe + feature list; Fig: sample price panel | Data cell date range from Colab |
+| 6 | RL design | 2 | 700–900 | Table: reward 3종; Fig: Safe-Guard sketch | `docs/reward_rationale.md` |
+| 7 | Risk-tag contract | 1–1.5 | 400–550 | Table: schema; Fig: causal panel → obs | `/risk-tags/apply` demo |
+| 8 | RAG agent | 1.5 | 450–600 | Fig: plan→…→summarize; Table: citation fields | stub `true` until live LLM |
+| 9 | Experiment protocol | 1.5–2 | 500–700 | Table: knobs (timesteps/seeds/windows) | `colab_run.ipynb` settings |
+| 10 | Evaluation | 2–2.5 | 800–1000 | **Tables: WF metrics / ANOVA / SHAP** | Colab CSVs only |
+| 11 | API / UI / Docker / CI | 1 | 300–450 | Screenshots | `make compose-up` |
+| 12 | Disclaimer | 0.5 | 200–300 | Boxed disclaimer text | copy as-is |
+| 13 | Limitations & ethics | 1–1.5 | 400–550 | Link hypotheses H1–H8 | `docs/error_analysis.md` |
+| 14 | Next steps | 0.5 | 150–250 | — | ownership list |
+| A–C | Appendices | ~2 | 400–600 | API table, env vars, reproduce | pin Colab commit SHA |
+
+**Sum:** aim **18–22 pages** exported from Notion. Sections 10 + 13 stay skeleton until Colab numbers exist.
+
 ---
 
 ## 1. Title & team (~0.5–1 p)
@@ -160,7 +182,16 @@ Schema (RAG → RL):
 - SHAP: offline `rl.shap_explain`; API loads JSON artifact if present else clear stub.
 - Tracking sheet: `docs/performance_targets.md` (placeholders only until Colab).
 
-`TODO`: final Walk-Forward numbers from `colab_run.ipynb` (≥100k×3 rewards×≥2 windows), error analysis vs equal-weight — **pending Colab numbers. Do not invent.**
+`TODO`: final Walk-Forward numbers from `colab_run.ipynb` (≥100k×3 rewards×≥2 windows) — **pending Colab numbers. Do not invent.**
+
+**Error analysis plug-in:** follow `docs/error_analysis.md` (hypotheses H1–H8, CSV read-out order). PDF subsection suggestion under §10 or §13:
+
+1. Protocol sanity (timesteps / rewards / windows / seeds).  
+2. Metric table (paste CSV).  
+3. Windows where DRL ≪ EW.  
+4. Hypothesis confirm/reject checklist.  
+5. What remains `TODO` after Colab.
+
 
 ---
 
@@ -170,7 +201,7 @@ Schema (RAG → RL):
 - Streamlit tabs: Overview, Optimize, Explain, Research, Risk-tag wiring, Backtest, ANOVA, Health.
 - Docker Compose: api healthcheck on `/health`; streamlit `depends_on` with `condition: service_healthy`.
 - Make targets: `make test|api|streamlit|compose-up|compose-down|fmt-check`.
-- CI: `.github/workflows/ci.yml` (pytest).
+- CI: `.github/workflows/ci.yml` (pytest). Docker image `python:3.12-slim`. See `docs/ci_python_note.md` (GHA still 3.11 + env markers until `workflow` scope).
 
 `TODO`: screenshots of Swagger + Streamlit; latency notes from `/backtest`.
 
