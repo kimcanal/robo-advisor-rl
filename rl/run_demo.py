@@ -93,11 +93,15 @@ def main(n_assets=6, window=WINDOW_SIZE, timesteps=8000, test_days=252, tickers=
 
     # S&P500 + KOSPI 벤치마크를 12지표 비교표에 포함 (EW/MVO만이 아님)
     try:
-        market = load_market_benchmarks(start, end, allow_download=True)
+        market = load_market_benchmarks(
+            start, end, allow_download=True, required=("spy",)
+        )
         for bname, bseries in market.items():
             aligned = bseries.reindex(test_returns_df.index).dropna()
             if len(aligned):
                 all_series[bname] = aligned
+        if "kospi" not in market:
+            print("[demo] kospi 벤치마크 생략 (soft-fail) — spy/전략 비교는 계속")
     except BenchmarkDownloadError as e:
         if use_dummy:
             print(f"[demo] 벤치마크 로드 실패 → 합성 폴백 ({e})")
