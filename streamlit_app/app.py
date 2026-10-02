@@ -50,6 +50,12 @@ with tabs[0]:
         "Architecture: **Streamlit → HTTP → FastAPI → rl.* / rag stub** "
         "(plan → retrieve → tag_risk → verify → summarize)."
     )
+    st.info(
+        "Notion docs (repo): `docs/error_analysis.md` (WF vs EW hypotheses), "
+        "`docs/report/outline.md` (~20p PDF skeleton), "
+        "`docs/performance_targets.md` (fill from Colab only). "
+        "RAG/API responses keep **stub: true** until live LLM/artifacts land."
+    )
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("Ping /health", key="ov_hlt"):

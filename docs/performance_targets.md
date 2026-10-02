@@ -83,5 +83,6 @@ API smoke path (`GET /backtest`) uses **synthetic** series only — mark as `stu
 2. Copy metrics from WF / demo output CSVs under `rl/outputs/` (or Colab downloads).
 3. Replace `pending Colab numbers` with actual floats; leave API/synth rows as `stub`.
 4. Never backfill invented sharpe/MDD/CAGR into README or the PDF report.
+5. For **why** DRL may lag EW (hypotheses, CSV read-out), see `docs/error_analysis.md` — fill confirm/reject only after Colab.
 
 **Disclaimer:** Educational demo only. Backtests ≠ future returns. Not investment advice.
