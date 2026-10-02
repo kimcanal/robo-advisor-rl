@@ -131,7 +131,7 @@
 | **Error analysis** | ✅ 구조화 (수치 ⏳) | `docs/error_analysis.md` (H1–H8 hypotheses, WF CSV read-out) + `rl/README` 한계 6–7 — **Colab 숫자는 Yunha** |
 | **Financial disclaimer** | ✅ | 아래 고지 + API/Streamlit 캡션 |
 | **Report outline (~20p)** | ✅ skeleton | `docs/report/outline.md` (page budget + App D) |
-| **Morning review (Yunha)** | ✅ | `docs/morning_review.md`, `docs/notion_submission_map.md` |
+| **Morning review (Yunha)** | ✅ | `docs/morning_review.md`, `docs/notion_submission_map.md`, `docs/submission_checklist.md` (one-pager) |
 
 ### API / UI quick start
 
@@ -146,7 +146,7 @@ make streamlit    # API만 호출, 모델 직접 로드 금지
 make compose-up   # api healthcheck + streamlit
 ```
 
-Endpoints: `GET /health`, `POST /optimize`, `POST /explain` (artifact JSON or clear stub), `POST /research` (RAG plan/verify + citations), `POST /risk-tags/apply` (panel + env obs wiring), `GET /backtest` (synth SPY/KOSPI + latency_ms), `POST /anova` (합성 ANOVA).
+Endpoints: `GET /health` (version + educational + `endpoints` list), `POST /optimize`, `POST /explain` (artifact JSON or clear stub), `POST /research` (RAG plan/verify + citations), `POST /risk-tags/apply` (panel + env obs wiring), `GET /backtest` (synth SPY/KOSPI + latency_ms), `POST /anova` (합성 ANOVA).
 
 ## Colab 재검증 (Notion week-38)
 

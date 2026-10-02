@@ -16,6 +16,7 @@ Quick index for graders / morning review. Educational demo only.
 | Error analysis | ✅ structure / ⏳ nums | `docs/error_analysis.md` |
 | Financial disclaimer | ✅ | README, API `/health`, Streamlit caption, outline §12 |
 | ~20p PDF report | ✅ skeleton | `docs/report/outline.md` (+ App D) |
+| OpenAPI / health contract | ✅ | `GET /health` endpoints + `tests/test_openapi_routes.py` |
 | Colab WF numbers | ⏳ Yunha | `colab_run.ipynb` on **master** |
 
-See also: `docs/morning_review.md`.
+See also: `docs/morning_review.md`, `docs/submission_checklist.md` (morning one-pager).

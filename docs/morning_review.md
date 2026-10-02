@@ -5,15 +5,18 @@
 
 ## Do first
 
-1. Open [PR #3](https://github.com/kimcanal/robo-advisor-rl/pull/3) — tip should be `0f64419` or later; **CI green**.
+1. Open [PR #3](https://github.com/kimcanal/robo-advisor-rl/pull/3) — tip = **latest tip on PR #3** (see PR body); **CI green**.
 2. Skim diff: API/Streamlit/Docker/RAG stubs + docs only; RL training core unchanged aside from earlier KS11 soft-fail on master.
 3. Optional: `make compose-up` or `make api` + Swagger `/docs`; with API up, `make smoke` hits `/health`.
+4. One-page printout: `docs/submission_checklist.md` (Done / Yunha-owned / Blocked).
 
-## Overnight delta (~05:30 KST)
+## Overnight delta (~06:30 KST)
 
-- `docs/architecture.md` — mermaid Streamlit → FastAPI → rl/rag flowchart; linked from README + Notion map.
-- RAG `/research`: explicit `node_trace` + per-node `node_latencies_ms` (still `stub: true`).
-- Streamlit Overview mentions architecture + Notion map; Makefile `smoke` target; API **0.1.4**.
+- OpenAPI / route contract tests (`tests/test_openapi_routes.py`) — required paths + `/health` educational/disclaimer/version + `/research` stub trace.
+- `GET /health` now returns `endpoints` list; OpenAPI tag descriptions; API **0.1.5**.
+- Streamlit Health tab shows API version + educational disclaimer from `/health`.
+- `docs/submission_checklist.md` — morning one-pager; linked from README + Notion map.
+- Tip SHA in this file previously lagged (`0f64419`); now points at **latest tip on PR #3** (PR body has exact SHA).
 
 ## CI note
 
@@ -30,7 +33,7 @@
 
 ## Notion checklist (PR #3)
 
-Mostly ✅ (`docs/notion_submission_map.md`). Still pending on **your** side: Colab WF numbers, live RAG/LLM, final PDF export.
+Mostly ✅ (`docs/notion_submission_map.md`, `docs/submission_checklist.md`). Still pending on **your** side: Colab WF numbers, live RAG/LLM, final PDF export.
 
 ## Do not
 

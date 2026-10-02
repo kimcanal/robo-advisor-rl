@@ -29,6 +29,7 @@ def test_notion_docs_exist():
         "docs/morning_review.md",
         "docs/notion_submission_map.md",
         "docs/architecture.md",
+        "docs/submission_checklist.md",
         "rag/README.md",
         ".env.example",
     ):

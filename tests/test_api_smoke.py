@@ -132,10 +132,10 @@ def test_research_graph_node_trace_in_excerpt():
 def test_health_version_patch():
     r = client.get("/health")
     assert r.status_code == 200
-    # Keep in sync with api.__version__ (0.1.4+ after architecture / node_latencies).
+    # Keep in sync with api.__version__ (0.1.5+ after health endpoints / OpenAPI tags).
     ver = r.json().get("version", "")
     parts = [int(p) for p in ver.split(".")]
-    assert parts >= [0, 1, 4]
+    assert parts >= [0, 1, 5]
 
 
 def test_backtest_get():

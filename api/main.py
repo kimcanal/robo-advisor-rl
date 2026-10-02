@@ -25,6 +25,31 @@ from api.services.optimize import run_optimize
 from api.services.research import run_research
 from api.services.risk_apply import run_risk_tags_apply
 
+OPENAPI_TAGS = [
+    {"name": "ops", "description": "Liveness / grader smoke (health, educational disclaimer)."},
+    {"name": "portfolio", "description": "Portfolio weight helpers (equal / MVO educational demos)."},
+    {"name": "xai", "description": "Explainability stubs (SHAP artifact JSON or pseudo-SHAP)."},
+    {
+        "name": "research",
+        "description": (
+            "RAG LangGraph-style stub (plan→retrieve→tag_risk→verify→summarize) "
+            "and risk-tag → PortfolioEnv.portfolio_risk wiring. Always stub: true; no live LLM."
+        ),
+    },
+    {"name": "eval", "description": "Synthetic backtest metrics and educational ANOVA demos."},
+]
+
+# Canonical public paths (also returned by GET /health for graders).
+PUBLIC_ENDPOINTS = [
+    "/health",
+    "/optimize",
+    "/explain",
+    "/research",
+    "/backtest",
+    "/anova",
+    "/risk-tags/apply",
+]
+
 app = FastAPI(
     title="Robo-Advisor API",
     description=(
@@ -34,9 +59,11 @@ app = FastAPI(
         "RAG /research uses plan→retrieve→tag_risk→verify→summarize stub "
         "with in-memory store + citation placeholders (RAG_TOP_K / RAG_STUB_FORCE / RAG_COLLECTION). "
         "POST /risk-tags/apply demos causal panel → PortfolioEnv.portfolio_risk. "
-        "Docs: docs/architecture.md, docs/error_analysis.md, docs/report/outline.md, docs/morning_review.md."
+        "Docs: docs/architecture.md, docs/error_analysis.md, docs/report/outline.md, "
+        "docs/morning_review.md, docs/submission_checklist.md."
     ),
     version=__version__,
+    openapi_tags=OPENAPI_TAGS,
 )
 
 
@@ -49,6 +76,7 @@ def health() -> HealthResponse:
         disclaimer=(
             "Educational demo only — not investment advice; backtests ≠ future returns."
         ),
+        endpoints=list(PUBLIC_ENDPOINTS),
     )
 
 

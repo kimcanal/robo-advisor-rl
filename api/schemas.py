@@ -9,10 +9,14 @@ from pydantic import BaseModel, Field
 class HealthResponse(BaseModel):
     status: str = "ok"
     service: str = "robo-advisor-api"
-    version: str = "0.1.4"
+    version: str = "0.1.5"
     educational: bool = True
     disclaimer: str = (
         "Educational demo only — not investment advice; backtests ≠ future returns."
+    )
+    endpoints: list[str] = Field(
+        default_factory=list,
+        description="Public route paths for graders / smoke clients.",
     )
 
 

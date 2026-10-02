@@ -63,7 +63,11 @@ with tabs[0]:
         if st.button("Ping /health", key="ov_hlt"):
             try:
                 h = _get("/health")
-                st.success(h)
+                st.success(
+                    f"API v{h.get('version', '?')} · educational={h.get('educational')}"
+                )
+                if h.get("disclaimer"):
+                    st.caption(h["disclaimer"])
             except Exception as exc:
                 st.error(f"API call failed: {exc}")
     with col2:
@@ -304,8 +308,20 @@ with tabs[6]:
 with tabs[7]:
     st.subheader("Health / Settings")
     st.write(f"`API_BASE_URL` = `{API_BASE}`")
+    st.caption("Ping returns API version, educational flag, disclaimer, and public endpoints.")
     if st.button("GET /health", key="hlt"):
         try:
-            st.success(_get("/health"))
+            h = _get("/health")
+            ver = h.get("version", "?")
+            edu = h.get("educational")
+            disc = h.get("disclaimer") or ""
+            eps = h.get("endpoints") or []
+            st.success(f"API v{ver} · educational={edu}")
+            if disc:
+                st.warning(disc)
+            if eps:
+                st.write("**endpoints:** " + ", ".join(f"`{p}`" for p in eps))
+            with st.expander("raw JSON"):
+                st.json(h)
         except Exception as exc:
             st.error(f"API call failed: {exc}")
