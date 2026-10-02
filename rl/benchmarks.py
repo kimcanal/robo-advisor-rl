@@ -1,14 +1,16 @@
 """시장 벤치마크(S&P500 / KOSPI) 로더 — Walk-Forward·백테스트 12지표 비교용.
 
 우선순위:
-  1) 로컬 CSV `rl/data/raw/{SPY|GSPC|KS11}.csv` (Date + Close/Adj Close)
-  2) yfinance 다운로드 (SPY 또는 ^GSPC, KOSPI는 ^KS11)
+  1) 로컬 CSV `rl/data/raw/{SPY|GSPC|KS11|EWY}.csv` (Date + Close/Adj Close)
+  2) yfinance 다운로드 (SPY/^GSPC, KOSPI는 ^KS11 → KS11 → EWY 순)
 
-다운로드 실패 시 조용히 건너뛰지 않고 **명확한 메시지와 함께 예외**를 낸다.
-로컬 CSV 폴백 경로를 예외 메시지에 포함한다.
+필수 벤치마크(기본: spy) 실패 시 BenchmarkDownloadError.
+선택 벤치마크(기본: kospi)는 yfinance ImpersonateError·빈 다운로드 등에서
+**소프트 페일**: 명확한 로그 후 dict에서 생략해 Walk-Forward 전체가 중단되지 않게 한다.
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -17,6 +19,8 @@ import pandas as pd
 RAW_DIR = Path(__file__).parent / "data" / "raw"
 
 # 논리 이름 → (로컬 파일 stem 후보, yfinance 티커 후보)
+# kospi: ^KS11이 Colab/curl_cffi에서 ImpersonateError·empty로 자주 깨지므로
+# KS11(동일 심볼 변형) → EWY(MSCI Korea ETF) 순으로 폴백.
 BENCHMARK_SPECS: dict[str, dict] = {
     "spy": {
         "label": "S&P500 (SPY)",
@@ -24,11 +28,14 @@ BENCHMARK_SPECS: dict[str, dict] = {
         "yf_tickers": ("SPY", "^GSPC"),
     },
     "kospi": {
-        "label": "KOSPI (^KS11)",
-        "local_stems": ("KS11", "^KS11", "KOSPI"),
-        "yf_tickers": ("^KS11",),
+        "label": "KOSPI (^KS11 / EWY)",
+        "local_stems": ("KS11", "^KS11", "KOSPI", "EWY"),
+        "yf_tickers": ("^KS11", "KS11", "EWY"),
     },
 }
+
+# load_market_benchmarks 기본: spy는 필수, kospi는 소프트 페일
+DEFAULT_REQUIRED: tuple[str, ...] = ("spy",)
 
 
 class BenchmarkDownloadError(RuntimeError):
@@ -48,7 +55,6 @@ def _close_from_csv(path: Path) -> pd.Series:
 
 def _from_local(stems: tuple[str, ...], data_dir: Path) -> pd.Series | None:
     for stem in stems:
-        # stem may include ^ — strip for filename friendliness, also try raw
         candidates = [data_dir / f"{stem}.csv", data_dir / f"{stem.lstrip('^')}.csv"]
         for path in candidates:
             if path.exists():
@@ -123,7 +129,7 @@ def load_benchmark_prices(
     except Exception as e:
         raise BenchmarkDownloadError(
             f"[{spec['label']}] 다운로드 실패: {e}. "
-            f"폴백: `{data_dir}/{{SPY|KS11}}.csv`에 Date, Close 컬럼 CSV를 두세요."
+            f"폴백: `{data_dir}/{{SPY|KS11|EWY}}.csv`에 Date, Close 컬럼 CSV를 두세요."
         ) from e
 
 
@@ -153,20 +159,35 @@ def load_market_benchmarks(
     *,
     allow_download: bool = True,
     names: tuple[str, ...] = ("spy", "kospi"),
+    required: tuple[str, ...] | None = DEFAULT_REQUIRED,
 ) -> dict[str, pd.Series]:
-    """S&P500(SPY) + KOSPI 로그수익률 dict. 하나라도 실패하면 예외."""
+    """S&P500(SPY) + KOSPI 로그수익률 dict.
+
+    ``required``에 포함된 이름만 실패 시 BenchmarkDownloadError.
+    그 외(기본 kospi)는 stderr에 원인을 남기고 dict에서 생략한다
+    (Colab ImpersonateError / ^KS11 empty 등으로 WF 전체가 죽지 않게).
+    """
     out: dict[str, pd.Series] = {}
     errors: list[str] = []
+    required_set = set(r.lower().strip() for r in (required or ()))
     for name in names:
+        key = name.lower().strip()
         try:
-            out[name] = load_benchmark_returns(
-                name, start=start, end=end, data_dir=data_dir, allow_download=allow_download
+            out[key] = load_benchmark_returns(
+                key, start=start, end=end, data_dir=data_dir, allow_download=allow_download
             )
         except BenchmarkDownloadError as e:
-            errors.append(str(e))
+            if key in required_set:
+                errors.append(str(e))
+            else:
+                print(
+                    f"[benchmarks] {key} 로드 실패 → 해당 벤치마크 지표는 생략 (soft-fail). "
+                    f"원인: {e}",
+                    file=sys.stderr,
+                )
     if errors:
         raise BenchmarkDownloadError(
-            "시장 벤치마크 로드 실패:\n- " + "\n- ".join(errors)
+            "필수 시장 벤치마크 로드 실패:\n- " + "\n- ".join(errors)
         )
     return out
 

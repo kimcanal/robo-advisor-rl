@@ -38,10 +38,12 @@ SPY_OHLCV_PATH = Path(__file__).parent / "data" / "raw" / "SPY_ohlcv.csv"
 def _load_benchmarks_for_run(start: str, end: str, use_dummy: bool) -> dict:
     """S&P500(SPY) + KOSPI 로그수익률.
 
-    로컬 CSV → yfinance 순. 실패 시: 실데이터 모드면 예외, 더미 모드면 합성 폴백.
+    로컬 CSV → yfinance 순. spy는 필수; kospi는 soft-fail(생략) 가능.
+    필수(spy)까지 실패 시: 실데이터 모드면 예외, 더미 모드면 합성 폴백.
     """
     try:
-        return load_market_benchmarks(start, end, allow_download=True)
+        # required=("spy",): ^KS11 ImpersonateError/empty여도 WF 전체가 죽지 않음
+        return load_market_benchmarks(start, end, allow_download=True, required=("spy",))
     except BenchmarkDownloadError as e:
         if not use_dummy:
             raise
@@ -152,7 +154,15 @@ def run(
         equal_ret = equal_weight_backtest(test_returns.iloc[window:])
         test_idx = test_returns.iloc[window:].index
         spy_ret = align_benchmark_returns(market_benchmarks["spy"], test_idx).dropna()
-        kospi_ret = align_benchmark_returns(market_benchmarks["kospi"], test_idx).dropna()
+        # kospi may be absent after soft-fail (ImpersonateError / empty ^KS11)
+        kospi_series = market_benchmarks.get("kospi")
+        kospi_ret = (
+            align_benchmark_returns(kospi_series, test_idx).dropna()
+            if kospi_series is not None
+            else pd.Series(dtype=float)
+        )
+        if kospi_series is None:
+            print(f"[walk_forward] window{w_idx+1} kospi → SKIP (benchmark soft-fail / not loaded)")
         # 12-metric comparison vs DRL: EW/MVO + market benchmarks (S&P500, KOSPI)
         baselines = [
             ("mvo", mvo_ret),
