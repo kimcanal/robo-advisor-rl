@@ -32,7 +32,9 @@ app = FastAPI(
         "Not investment advice; backtests ≠ future returns. "
         "ANOVA endpoints use synthetic demo series for teaching only. "
         "RAG /research uses plan→retrieve→tag_risk→verify→summarize stub "
-        "with in-memory store + citation placeholders. POST /risk-tags/apply demos causal panel → PortfolioEnv.portfolio_risk."
+        "with in-memory store + citation placeholders (RAG_TOP_K / RAG_STUB_FORCE / RAG_COLLECTION). "
+        "POST /risk-tags/apply demos causal panel → PortfolioEnv.portfolio_risk. "
+        "Docs: docs/error_analysis.md, docs/report/outline.md, docs/morning_review.md."
     ),
     version=__version__,
 )

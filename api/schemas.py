@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 class HealthResponse(BaseModel):
     status: str = "ok"
     service: str = "robo-advisor-api"
-    version: str = "0.1.2"
+    version: str = "0.1.3"
     educational: bool = True
     disclaimer: str = (
         "Educational demo only — not investment advice; backtests ≠ future returns."
