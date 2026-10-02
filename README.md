@@ -101,8 +101,23 @@
 - ✅ Walk-Forward(`walk_forward.py`)에 VecNormalize 적용·증분 CSV 저장·BIL/피처래그/
   베이스라인 수수료 공정성 반영. 기존 발표 수치는 구버전일 수 있으므로 Colab
   `colab_run.ipynb`로 재실행한 결과를 최종으로 쓸 것
+- ✅ Colab `colab_run.ipynb`: 매 실행 `master` 신규 클론 → data(BIL/`SPY_ohlcv`) →
+  데모 또는 풀 WF(≥100k×3보상×≥2윈도우) → 12지표(EW/MVO/SPY/KOSPI) → ANOVA →
+  SHAP → risk-tag 스텁 → 결과 다운로드. GPU 불필요. Notion week-38 체크리스트 매핑 포함.
+- ✅ 리스크 태그 스텁(`rl/risk_tags.py`) + SPY/KOSPI 벤치마크가 WF 비교표에 포함 (PR#2)
 - ⏳ 동일가중 포트폴리오를 아직 절대수치로는 못 이김 — 원인 추적 중 (관측값에
   drawdown 미포함 등), 과제 스펙의 Why/How 문서화 요구에 맞춰 계속 기록 중
 - ⏳ 데이터팀 실제 수집 파이프라인 대기 중 (연결되면 `rl/data/raw/`에 CSV만 추가)
-- ⏳ 리서치·RAG 리스크 태그 인터페이스 대기 중
-- ⏳ FastAPI/Streamlit/Docker는 백엔드팀 담당, 아직 미착수
+- ⏳ 리서치·RAG 실시간 태그 연동 (스키마/관측 축은 스텁으로 준비됨)
+- ⏳ FastAPI/Streamlit/Docker는 백엔드팀 담당 (별도 PR 스켈레톤 가능)
+
+## Colab 재검증 (Notion week-38)
+
+[`colab_run.ipynb`](colab_run.ipynb) — Open in Colab 배지로 실행.
+
+1. Setup: `rm -rf` 후 `master` 클론 + `rl/requirements.txt`
+2. Data: `fetch_real_data` + **BIL / SPY_ohlcv / risk-free 상태 큰 출력**
+3. Train: 짧은 `run_demo` **또는** 풀 `walk_forward --real --timesteps 120000` (≥100k, 보상 3종, ≥2 윈도우; 증분 CSV)
+4. Metrics / ANOVA / SHAP / risk-tag 스텁 / 결과 다운로드 (`Path.exists` 가드)
+
+**Disclaimer:** 교육·연구 목적. 백테스트 ≠ 미래 수익. 투자 자문 아님.
