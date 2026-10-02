@@ -143,9 +143,9 @@ python -m rl.experiments --which window --timesteps 15000
 
 1. 포트폴리오 수익률을 "자산별 로그수익률의 가중합"으로 근사 중 — 엄밀한 정의는
    아니지만 FinRL 등에서 흔히 쓰는 단순화. 리포트에 명시 필요.
-2. Walk-Forward 자체는 `walk_forward.py`로 자동화 완료(윈도우 이동마다 실제 재학습).
-   다만 이 스크립트는 **VecNormalize 도입 이전** 버전으로 돌린 결과가 마지막이라,
-   VecNormalize 적용 후 재실행하면 수치가 바뀔 수 있음 — 다음 실행 후보.
+2. Walk-Forward는 `walk_forward.py`로 자동화(윈도우 이동마다 재학습 + VecNormalize).
+   윈도우/시드마다 결과 CSV를 증분 저장한다. 구버전 발표 수치는 Colab
+   `colab_run.ipynb`로 재실행해 교체할 것.
 3. SHAP은 `KernelExplainer` 기반이라 자산 수/윈도우가 커지면 느려짐. 10자산+윈도우
    30이면 관측 차원이 400에 육박 — 배경 표본을 줄이거나 `nsamples`를 낮출 것.
 4. 실데이터 연결: `data/raw/{ticker}.csv`에 `Date`, `Close`/`Adj Close` 컬럼의 CSV를

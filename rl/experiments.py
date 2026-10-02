@@ -39,12 +39,16 @@ def _split(returns, rsi_df, macd_df, window, test_days):
 
 
 def _train_and_eval(train_data, test_data, window, reward_type, reward_kwargs, timesteps, seed=0, risk_free=0.0):
-    train_env_fn = lambda: PortfolioEnv(*train_data, window=window, reward_type=reward_type, reward_kwargs=reward_kwargs)
+    train_env_fn = lambda reward_type=reward_type, reward_kwargs=reward_kwargs: PortfolioEnv(
+        *train_data, window=window, reward_type=reward_type, reward_kwargs=reward_kwargs
+    )
     train_venv = make_train_vecnorm(train_env_fn)
     model = PPO("MlpPolicy", train_venv, verbose=0, seed=seed)
     model.learn(total_timesteps=timesteps)
 
-    test_env_fn = lambda: PortfolioEnv(*test_data, window=window, reward_type=reward_type, reward_kwargs=reward_kwargs)
+    test_env_fn = lambda reward_type=reward_type, reward_kwargs=reward_kwargs: PortfolioEnv(
+        *test_data, window=window, reward_type=reward_type, reward_kwargs=reward_kwargs
+    )
     eval_venv = make_eval_vecnorm(test_env_fn, train_venv)
     rets, _ = rollout_vecnorm(model, eval_venv)
     series = pd.Series(rets)

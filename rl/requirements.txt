@@ -8,4 +8,9 @@ matplotlib==3.11.2
 shap==0.52.0
 statsmodels==0.15.0
 yfinance==1.7.0
+# yfinance 1.7+ pulls curl_cffi for TLS impersonation. ImpersonateError
+# (unsupported chromeXX profile) usually means curl_cffi is too old/new vs
+# yfinance — upgrade curl_cffi, or set YF_DISABLE_CURL_CFFI=1 to fall back
+# to requests. Prefer curl_cffi>=0.15 with a matching yfinance release.
+curl_cffi>=0.15
 pytest==9.1.1

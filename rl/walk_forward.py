@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
 
 import pandas as pd
@@ -18,7 +17,7 @@ from stable_baselines3 import PPO
 from .backtest import compute_metrics, walk_forward_windows
 from .config import WINDOW_SIZE
 from .env.portfolio_env import PortfolioEnv
-from .mvo import rolling_mvo_backtest
+from .mvo import equal_weight_backtest, rolling_mvo_backtest
 from .pipeline import prepare_env_inputs
 from .regime import MarketRegimeDetector, load_spy_regime
 from .riskfree import fetch_risk_free_rate
@@ -39,6 +38,13 @@ def _build_daily_regime(returns_df: pd.DataFrame) -> pd.Series:
         bench_price = (1 + returns_df.mean(axis=1)).cumprod()
         regime = MarketRegimeDetector().detect(bench_price)
     return regime.reindex(returns_df.index).ffill().bfill()
+
+
+def _save_incremental(rows: list, daily_rows: list) -> None:
+    """윈도우/시드가 끝날 때마다 CSV를 덮어써서 장시간 실행 중 유실을 막는다."""
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows).to_csv(OUT_DIR / "walk_forward_results.csv", index=False)
+    pd.DataFrame(daily_rows).to_csv(OUT_DIR / "walk_forward_daily.csv", index=False)
 
 
 def run(
@@ -86,12 +92,19 @@ def run(
         for rt in reward_types:
             reward_kwargs = {"mdd_lambda": 1.0} if rt == "mdd_penalty" else {}
             for seed in seeds:
-                train_env_fn = lambda: PortfolioEnv(train_returns, train_rsi, train_macd, window=window, reward_type=rt, reward_kwargs=reward_kwargs)
+                # default-arg binding으로 루프 변수 late-binding 방지
+                train_env_fn = lambda rt=rt, reward_kwargs=reward_kwargs: PortfolioEnv(
+                    train_returns, train_rsi, train_macd, window=window,
+                    reward_type=rt, reward_kwargs=reward_kwargs,
+                )
                 train_venv = make_train_vecnorm(train_env_fn)
                 model = PPO("MlpPolicy", train_venv, verbose=0, seed=seed)
                 model.learn(total_timesteps=timesteps)
 
-                test_env_fn = lambda: PortfolioEnv(test_returns, test_rsi, test_macd, window=window, reward_type=rt, reward_kwargs=reward_kwargs)
+                test_env_fn = lambda rt=rt, reward_kwargs=reward_kwargs: PortfolioEnv(
+                    test_returns, test_rsi, test_macd, window=window,
+                    reward_type=rt, reward_kwargs=reward_kwargs,
+                )
                 eval_venv = make_eval_vecnorm(test_env_fn, train_venv)
                 rets, _ = rollout_vecnorm(model, eval_venv)
                 metrics = compute_metrics(pd.Series(rets), risk_free=risk_free)
@@ -102,9 +115,11 @@ def run(
                 for d, r in zip(dates, rets):
                     daily_rows.append({"window": w_idx + 1, "strategy": f"drl_{rt}", "seed": seed, "date": d, "daily_return": r, "regime": daily_regime.loc[d]})
 
+                _save_incremental(rows, daily_rows)
+
         combined_for_mvo = pd.concat([train_returns, test_returns.iloc[window:]])
         mvo_ret = rolling_mvo_backtest(combined_for_mvo).iloc[-len(test_returns.iloc[window:]):]
-        equal_ret = test_returns.iloc[window:].mean(axis=1)
+        equal_ret = equal_weight_backtest(test_returns.iloc[window:])
         for name, series in [("mvo", mvo_ret), ("equal_weight", equal_ret)]:
             metrics = compute_metrics(series, risk_free=risk_free)
             rows.append({"window": w_idx + 1, "strategy": name, "seed": None, **metrics})
@@ -112,10 +127,10 @@ def run(
             for d, r in series.items():
                 daily_rows.append({"window": w_idx + 1, "strategy": name, "seed": None, "date": d, "daily_return": r, "regime": daily_regime.loc[d]})
 
+        _save_incremental(rows, daily_rows)
+
     df = pd.DataFrame(rows)
-    df.to_csv(OUT_DIR / "walk_forward_results.csv", index=False)
     daily_df = pd.DataFrame(daily_rows)
-    daily_df.to_csv(OUT_DIR / "walk_forward_daily.csv", index=False)
     print("\n[walk_forward] 전체 결과 (윈도우별 요약):")
     print(df[["window", "strategy", "seed", "cumulative_return", "sharpe", "mdd"]])
 

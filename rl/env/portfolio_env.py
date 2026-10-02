@@ -67,9 +67,13 @@ class PortfolioEnv(gym.Env):
         self.peak_value = 1.0
 
     def _get_obs(self) -> np.ndarray:
+        # returns[t-window:t] 는 현재 바(t)를 제외한 과거 수익률.
+        # RSI/MACD는 t-1을 써서 returns[t]와 같은 바의 가격 정보가 관측에
+        # 새어 들어가지 않도록 1일 래그 (look-ahead 방지).
         ret_window = self.returns[self.t - self.window : self.t].flatten()
+        feat_t = self.t - 1
         obs = np.concatenate(
-            [ret_window, self.weights, self.rsi[self.t], self.macd[self.t]]
+            [ret_window, self.weights, self.rsi[feat_t], self.macd[feat_t]]
         )
         return obs.astype(np.float32)
 
@@ -98,7 +102,11 @@ class PortfolioEnv(gym.Env):
         cost = turnover * self.fee_rate
         net_return = gross_return - cost
 
-        self.portfolio_value *= (1 + net_return)
+        # Compounding consistency with backtest.compute_metrics / _drawdown_series:
+        # asset returns are log-returns; portfolio step return is their weighted
+        # sum (FinRL-style approx) and is treated as an approximate log-return.
+        # Use exp compounding here so Safe-Guard MDD matches backtest MDD.
+        self.portfolio_value *= float(np.exp(net_return))
         self.peak_value = max(self.peak_value, self.portfolio_value)
         drawdown = (self.peak_value - self.portfolio_value) / self.peak_value
 

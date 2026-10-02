@@ -99,8 +99,9 @@
   역사적 사건(코로나/2022 약세장/2021 강세장)과 대조 검증 완료
 - ✅ VecNormalize 적용 전후 비교: 동일 시드(5~9) 기준 simple·mdd_penalty 보상함수가
   수익률↑·MDD↓ 동시 개선을 재현성 있게 확인 (`rl/outputs/experiments/` 참고)
-- ⚠️ Walk-Forward(`walk_forward.py`)는 VecNormalize 적용 **이전** 코드로 돌린 결과임 —
-  재실행하면 수치가 달라질 수 있음 (다음 작업 후보)
+- ✅ Walk-Forward(`walk_forward.py`)에 VecNormalize 적용·증분 CSV 저장·BIL/피처래그/
+  베이스라인 수수료 공정성 반영. 기존 발표 수치는 구버전일 수 있으므로 Colab
+  `colab_run.ipynb`로 재실행한 결과를 최종으로 쓸 것
 - ⏳ 동일가중 포트폴리오를 아직 절대수치로는 못 이김 — 원인 추적 중 (관측값에
   drawdown 미포함 등), 과제 스펙의 Why/How 문서화 요구에 맞춰 계속 기록 중
 - ⏳ 데이터팀 실제 수집 파이프라인 대기 중 (연결되면 `rl/data/raw/`에 CSV만 추가)

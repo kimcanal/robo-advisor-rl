@@ -4,11 +4,16 @@ CSV로 저장한다. 조윤상님의 정식 데이터 파이프라인이 아니�
 
 사용:
     python -m rl.data.fetch_real_data
+
+저장물:
+  - data/raw/{ticker}.csv          : Date, Close (자산 + BIL)
+  - data/raw/SPY_ohlcv.csv         : Date, Close, Volume (regime.py / walk_forward용)
 """
 from __future__ import annotations
 
 from pathlib import Path
 
+import pandas as pd
 import yfinance as yf
 
 RAW_DIR = Path(__file__).parent / "raw"
@@ -19,7 +24,7 @@ TICKERS = [
     "QQQ",  # 미국 나스닥 기술주
     "IWM",  # 미국 소형주
     "EFA",  # 선진국(미국 제외) 주식
-    "EEM",  # 신�흥국 주식
+    "EEM",  # 신흥국 주식
     "AGG",  # 미국 종합채권
     "TLT",  # 미국 장기국채
     "HYG",  # 하이일드 회사채
@@ -27,18 +32,49 @@ TICKERS = [
     "VNQ",  # 리츠(부동산)
 ]
 
+# 무위험이자율 프록시 — 자산 유니버스에는 넣지 않고 별도 CSV로만 저장
+RISK_FREE_TICKER = "BIL"
+
+
+def _save_close_csv(close: pd.Series, ticker: str) -> Path:
+    df = close.dropna().reset_index()
+    df.columns = ["Date", "Close"]
+    out_path = RAW_DIR / f"{ticker}.csv"
+    df.to_csv(out_path, index=False)
+    print(f"[fetch] {ticker}: {len(df)}행, {df['Date'].min().date()}~{df['Date'].max().date()} -> {out_path}")
+    return out_path
+
+
+def _save_spy_ohlcv(data) -> Path | None:
+    """walk_forward / regime.load_spy_regime이 기대하는 SPY_ohlcv.csv를 저장."""
+    try:
+        close = data["Close"]["SPY"]
+        volume = data["Volume"]["SPY"]
+    except Exception as e:
+        print(f"[fetch] SPY_ohlcv 저장 실패: {e}")
+        return None
+    df = pd.DataFrame({"Close": close, "Volume": volume}).dropna().reset_index()
+    if df.columns[0] != "Date":
+        df = df.rename(columns={df.columns[0]: "Date"})
+    out_path = RAW_DIR / "SPY_ohlcv.csv"
+    df[["Date", "Close", "Volume"]].to_csv(out_path, index=False)
+    print(f"[fetch] SPY_ohlcv: {len(df)}행 -> {out_path}")
+    return out_path
+
 
 def fetch(tickers=TICKERS, start="2019-01-01", end=None):
     RAW_DIR.mkdir(parents=True, exist_ok=True)
-    data = yf.download(tickers, start=start, end=end, auto_adjust=True, progress=False)
+    all_tickers = list(dict.fromkeys([*tickers, RISK_FREE_TICKER]))
+    data = yf.download(all_tickers, start=start, end=end, auto_adjust=True, progress=False)
 
     for ticker in tickers:
-        close = data["Close"][ticker].dropna()
-        df = close.reset_index()
-        df.columns = ["Date", "Close"]
-        out_path = RAW_DIR / f"{ticker}.csv"
-        df.to_csv(out_path, index=False)
-        print(f"[fetch] {ticker}: {len(df)}행, {df['Date'].min().date()}~{df['Date'].max().date()} -> {out_path}")
+        _save_close_csv(data["Close"][ticker], ticker)
+
+    # BIL: riskfree.py가 로컬 CSV를 yfinance보다 우선 사용
+    _save_close_csv(data["Close"][RISK_FREE_TICKER], RISK_FREE_TICKER)
+
+    if "SPY" in tickers:
+        _save_spy_ohlcv(data)
 
     return tickers
 
