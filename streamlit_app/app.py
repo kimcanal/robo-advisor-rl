@@ -123,17 +123,24 @@ with tabs[2]:
 
 with tabs[3]:
     st.subheader("Research (RAG plan / exec / verify)")
+    st.caption("Educational stub (no live LLM). Responses include stub=true. Env: RAG_TOP_K / RAG_STUB_FORCE / RAG_COLLECTION.")
     query = st.text_input("query", "market risk outlook")
     tickers_r = st.text_input("tickers", "SPY,QQQ,TLT", key="res_tickers")
+    res_top_k = st.slider("retrieve top_k", 1, 15, 5, key="res_top_k")
     if st.button("Run /research", key="res"):
         try:
             tickers = [t.strip() for t in tickers_r.split(",") if t.strip()]
             data = _post(
                 "/research",
-                {"query": query, "tickers": tickers, "n_events_per_ticker": 2, "top_k": 5},
+                {
+                    "query": query,
+                    "tickers": tickers,
+                    "n_events_per_ticker": 2,
+                    "top_k": int(res_top_k),
+                },
             )
             st.write(
-                f"**verify_ok:** {data.get('verify_ok')} · "
+                f"**verify_ok:** {data.get('verify_ok')} · stub={data.get('stub')} · "
                 f"trace: `{' → '.join(data.get('node_trace') or [])}` · "
                 f"latency_ms={data.get('latency_ms')}"
             )

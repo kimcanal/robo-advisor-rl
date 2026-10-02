@@ -130,6 +130,8 @@
 | **CI (GitHub Actions)** | ✅ workflow + pin note | `.github/workflows/ci.yml` (pytest). Docker `python:3.12-slim`. GHA still 3.11 + `rl/requirements.txt` env markers for numpy/scipy/shap — see `docs/ci_python_note.md` (workflow bump needs `workflow` scope) |
 | **Error analysis** | ✅ 구조화 (수치 ⏳) | `docs/error_analysis.md` (H1–H8 hypotheses, WF CSV read-out) + `rl/README` 한계 6–7 — **Colab 숫자는 Yunha** |
 | **Financial disclaimer** | ✅ | 아래 고지 + API/Streamlit 캡션 |
+| **Report outline (~20p)** | ✅ skeleton | `docs/report/outline.md` (page budget + App D) |
+| **Morning review (Yunha)** | ✅ | `docs/morning_review.md`, `docs/notion_submission_map.md` |
 
 ### API / UI quick start
 
