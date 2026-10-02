@@ -5,7 +5,7 @@
 
 ## Do first
 
-1. Open [PR #3](https://github.com/kimcanal/robo-advisor-rl/pull/3) — tip = **latest tip on PR #3** (see PR body); **CI green**.
+1. Open [PR #3](https://github.com/kimcanal/robo-advisor-rl/pull/3) — tip should be `ae27e28` or later; **CI green**.
 2. Skim diff: API/Streamlit/Docker/RAG stubs + docs only; RL training core unchanged aside from earlier KS11 soft-fail on master.
 3. Optional: `make compose-up` or `make api` + Swagger `/docs`; with API up, `make smoke` hits `/health`.
 4. One-page printout: `docs/submission_checklist.md` (Done / Yunha-owned / Blocked).
@@ -16,7 +16,7 @@
 - `GET /health` now returns `endpoints` list; OpenAPI tag descriptions; API **0.1.5**.
 - Streamlit Health tab shows API version + educational disclaimer from `/health`.
 - `docs/submission_checklist.md` — morning one-pager; linked from README + Notion map.
-- Tip SHA in this file previously lagged (`0f64419`); now points at **latest tip on PR #3** (PR body has exact SHA).
+- Tip SHA synced to `ae27e28` (was stale `0f64419`).
 
 ## CI note
 
