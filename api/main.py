@@ -27,7 +27,9 @@ app = FastAPI(
     description=(
         "Educational skeleton wrapping RL / research modules. "
         "Not investment advice; backtests ≠ future returns. "
-        "ANOVA endpoints use synthetic demo series for teaching only."
+        "ANOVA endpoints use synthetic demo series for teaching only. "
+        "RAG /research uses plan→retrieve→tag_risk→verify→summarize stub "
+        "with in-memory store + citation placeholders."
     ),
     version=__version__,
 )
@@ -58,8 +60,18 @@ def backtest(
     n_days: int = Query(default=252, ge=20, le=2520),
     seed: int = Query(default=0),
     include_benchmark: bool = Query(default=True),
+    benchmarks: str = Query(
+        default="spy,kospi",
+        description="Comma-separated logical benchmarks (synthetic if no CSV).",
+    ),
 ) -> BacktestResponse:
-    return run_backtest(n_days=n_days, seed=seed, include_benchmark=include_benchmark)
+    names = [b.strip() for b in benchmarks.split(",") if b.strip()] or ["spy", "kospi"]
+    return run_backtest(
+        n_days=n_days,
+        seed=seed,
+        include_benchmark=include_benchmark,
+        benchmarks=names,
+    )
 
 
 @app.post(

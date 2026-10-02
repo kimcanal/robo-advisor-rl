@@ -1,7 +1,7 @@
-"""Minimal graph-shaped research pipeline: retrieve → tag_risk → summarize.
+"""LangGraph-shaped research pipeline: plan → retrieve → tag_risk → verify → summarize.
 
-Mirrors LangGraph node/edge concepts with a plain dict state machine so we avoid
-pulling in heavy LangGraph/LangChain deps until the real RAG stack lands.
+Mirrors Notion week-38 RAG agent (plan/exec/verify) with a plain dict state machine
+so we avoid LangGraph/LangChain deps until the real stack lands.
 """
 from __future__ import annotations
 
@@ -10,9 +10,37 @@ from typing import Any, Callable
 
 import pandas as pd
 
-from rl.risk_tags import mock_risk_tags, validate_risk_tags
+from rag.store import InMemoryVectorStore, get_default_store
+from rl.risk_tags import SCHEMA_COLUMNS, mock_risk_tags, validate_risk_tags
 
 NodeFn = Callable[["ResearchState"], "ResearchState"]
+
+# Allowed risk tags (must stay aligned with rl.risk_tags.mock_risk_tags)
+ALLOWED_TAGS = frozenset({"earnings", "geopolitics", "credit", "liquidity", "regulatory"})
+
+
+@dataclass
+class Citation:
+    """Placeholder citation attached to retrieved / verified evidence."""
+
+    doc_id: str
+    title: str
+    source: str
+    ticker: str
+    score: float
+    snippet: str
+    quote: str = ""
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "doc_id": self.doc_id,
+            "title": self.title,
+            "source": self.source,
+            "ticker": self.ticker,
+            "score": self.score,
+            "snippet": self.snippet,
+            "quote": self.quote or self.snippet[:120],
+        }
 
 
 @dataclass
@@ -23,43 +51,140 @@ class ResearchState:
     tickers: list[str]
     n_events_per_ticker: int = 3
     seed: int = 0
-    # Node outputs
+    top_k: int = 5
+    # Plan / exec / verify artefacts
+    plan: list[str] = field(default_factory=list)
     retrieved_docs: list[dict[str, Any]] = field(default_factory=list)
+    citations: list[Citation] = field(default_factory=list)
     risk_tags_df: pd.DataFrame | None = None
+    verify_ok: bool = False
+    verify_notes: list[str] = field(default_factory=list)
     report_excerpt: str = ""
     node_trace: list[str] = field(default_factory=list)
+    store: InMemoryVectorStore | None = None
+
+
+def node_plan(state: ResearchState) -> ResearchState:
+    """Plan: decompose query into retrieve / tag / verify / summarize steps."""
+    state.node_trace.append("plan")
+    q = state.query.strip() or "market risk outlook"
+    state.plan = [
+        f"1. Retrieve corpus hits for query={q!r} over tickers={state.tickers}",
+        "2. Execute risk tagging (rl.risk_tags schema) from retrieved context",
+        "3. Verify schema + citation coverage (Self-Correction placeholder)",
+        "4. Summarize report excerpt with citation placeholders for Notion",
+    ]
+    return state
 
 
 def node_retrieve(state: ResearchState) -> ResearchState:
-    """Stub retrieve: fake document hits keyed by query + tickers."""
+    """Exec retrieve: in-memory Chroma-lite query (falls back to per-ticker stubs)."""
     state.node_trace.append("retrieve")
     q = state.query.strip() or "market risk outlook"
-    state.retrieved_docs = [
-        {
-            "ticker": t,
-            "title": f"[stub] {q} — {t}",
-            "snippet": f"Synthetic snippet for {t} regarding {q!r}.",
-            "source": "stub://rag/retrieve",
-        }
-        for t in state.tickers
+    store = state.store or get_default_store()
+    hits = store.query(q, tickers=state.tickers, top_k=state.top_k)
+    # Ensure at least one stub hit per requested ticker if corpus misses it
+    seen = {str(h.get("ticker", "")).upper() for h in hits}
+    for t in state.tickers:
+        if t.upper() not in seen:
+            hits.append(
+                {
+                    "doc_id": f"stub-fallback-{t.lower()}",
+                    "ticker": t,
+                    "title": f"[stub] {q} — {t}",
+                    "text": f"Synthetic snippet for {t} regarding {q!r}.",
+                    "snippet": f"Synthetic snippet for {t} regarding {q!r}.",
+                    "source": "stub://rag/retrieve",
+                    "score": 0.01,
+                    "rank": len(hits) + 1,
+                    "tags": [],
+                }
+            )
+    state.retrieved_docs = hits
+    state.citations = [
+        Citation(
+            doc_id=str(h.get("doc_id", "")),
+            title=str(h.get("title", "")),
+            source=str(h.get("source", "")),
+            ticker=str(h.get("ticker", "")),
+            score=float(h.get("score", 0.0)),
+            snippet=str(h.get("snippet") or h.get("text", ""))[:240],
+            quote=str(h.get("snippet") or h.get("text", ""))[:120],
+        )
+        for h in hits[: state.top_k]
     ]
     return state
 
 
 def node_tag_risk(state: ResearchState) -> ResearchState:
-    """Stub tag_risk: emit rl.risk_tags-compatible mock events."""
+    """Exec tag_risk: emit rl.risk_tags-compatible mock events (env contract)."""
     state.node_trace.append("tag_risk")
     df = mock_risk_tags(
         state.tickers,
         n_events_per_ticker=state.n_events_per_ticker,
         seed=state.seed,
     )
+    # Soft bias: if a citation tag matches ALLOWED_TAGS, nudge one event tag
+    cite_tags = []
+    for c in state.citations:
+        for doc in state.retrieved_docs:
+            if doc.get("doc_id") == c.doc_id:
+                cite_tags.extend(doc.get("tags") or [])
+    cite_tags = [t for t in cite_tags if t in ALLOWED_TAGS]
+    if cite_tags and len(df):
+        df = df.copy()
+        df.loc[df.index[0], "tag"] = cite_tags[0]
     state.risk_tags_df = validate_risk_tags(df)
     return state
 
 
+def node_verify(state: ResearchState) -> ResearchState:
+    """Verify / Self-Correction placeholder: schema + citation checks."""
+    state.node_trace.append("verify")
+    notes: list[str] = []
+    ok = True
+    if state.risk_tags_df is None or len(state.risk_tags_df) == 0:
+        ok = False
+        notes.append("no risk_tags produced")
+    else:
+        try:
+            validate_risk_tags(state.risk_tags_df)
+            missing = [c for c in SCHEMA_COLUMNS if c not in state.risk_tags_df.columns]
+            if missing:
+                ok = False
+                notes.append(f"schema missing columns: {missing}")
+            else:
+                notes.append("risk_tags schema OK (ticker, risk_score, tag, ts)")
+            bad_tags = set(state.risk_tags_df["tag"].astype(str)) - ALLOWED_TAGS
+            if bad_tags:
+                ok = False
+                notes.append(f"unknown tags: {sorted(bad_tags)}")
+            scores = state.risk_tags_df["risk_score"].astype(float)
+            if ((scores < 0) | (scores > 1)).any():
+                ok = False
+                notes.append("risk_score out of [0, 1]")
+        except Exception as exc:  # noqa: BLE001
+            ok = False
+            notes.append(f"schema validation failed: {exc}")
+
+    if not state.citations:
+        ok = False
+        notes.append("citations empty — retrieve produced no evidence")
+    else:
+        notes.append(f"citations={len(state.citations)} placeholder quotes attached")
+
+    covered = {c.ticker.upper() for c in state.citations}
+    for t in state.tickers:
+        if t.upper() not in covered:
+            notes.append(f"warning: no citation covering ticker {t}")
+
+    state.verify_ok = ok
+    state.verify_notes = notes
+    return state
+
+
 def node_summarize(state: ResearchState) -> ResearchState:
-    """Stub summarize: short report excerpt from tags + retrieved docs."""
+    """Summarize: report excerpt + citation placeholders for Notion."""
     state.node_trace.append("summarize")
     n_tags = 0 if state.risk_tags_df is None else len(state.risk_tags_df)
     n_docs = len(state.retrieved_docs)
@@ -68,19 +193,29 @@ def node_summarize(state: ResearchState) -> ResearchState:
         for _, row in state.risk_tags_df.head(3).iterrows():
             tags_preview.append(f"{row['ticker']}:{row['tag']}({row['risk_score']:.2f})")
     preview = ", ".join(tags_preview) if tags_preview else "(none)"
+    cite_bits = []
+    for i, c in enumerate(state.citations[:3], start=1):
+        cite_bits.append(f"[{i}] {c.doc_id} ({c.ticker}, score={c.score})")
+    cites = "; ".join(cite_bits) if cite_bits else "(no citations)"
+    verify_flag = "PASS" if state.verify_ok else "FAIL"
     state.report_excerpt = (
-        f"[LangGraph-shaped stub] query={state.query!r}; "
-        f"nodes={' → '.join(state.node_trace)}; "
-        f"docs={n_docs}; risk_events={n_tags}; sample=[{preview}]. "
-        "Replace rag.graph with real LangGraph + vector store when ready."
+        f"[LangGraph-shaped stub plan→retrieve→tag_risk→verify→summarize] "
+        f"query={state.query!r}; nodes={' → '.join(state.node_trace)}; "
+        f"docs={n_docs}; risk_events={n_tags}; verify={verify_flag}; "
+        f"sample=[{preview}]; citations={cites}. "
+        "Risk tags follow rl.risk_tags env contract "
+        "{ticker, risk_score[0,1], tag, ts} → PortfolioEnv portfolio_risk obs. "
+        "Replace rag.graph + rag.store with real LangGraph + ChromaDB when ready."
     )
     return state
 
 
-# Linear graph: retrieve → tag_risk → summarize (LangGraph edge analogue).
+# Linear graph: plan → retrieve → tag_risk → verify → summarize
 GRAPH_NODES: list[tuple[str, NodeFn]] = [
+    ("plan", node_plan),
     ("retrieve", node_retrieve),
     ("tag_risk", node_tag_risk),
+    ("verify", node_verify),
     ("summarize", node_summarize),
 ]
 
@@ -91,6 +226,8 @@ def run_research_graph(
     *,
     n_events_per_ticker: int = 3,
     seed: int = 0,
+    top_k: int = 5,
+    store: InMemoryVectorStore | None = None,
 ) -> ResearchState:
     """Run the stub graph and return the final state."""
     state = ResearchState(
@@ -98,6 +235,8 @@ def run_research_graph(
         tickers=list(tickers) or ["SPY"],
         n_events_per_ticker=n_events_per_ticker,
         seed=seed,
+        top_k=top_k,
+        store=store,
     )
     for _name, fn in GRAPH_NODES:
         state = fn(state)

@@ -6,5 +6,11 @@ No LLM API keys required for this educational stub.
 """
 
 from rag.graph import ResearchState, run_research_graph
+from rag.store import InMemoryVectorStore, get_default_store
 
-__all__ = ["ResearchState", "run_research_graph"]
+__all__ = [
+    "ResearchState",
+    "run_research_graph",
+    "InMemoryVectorStore",
+    "get_default_store",
+]

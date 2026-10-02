@@ -88,7 +88,7 @@
 - 중간 보고: 2026-11-09 주
 - 완료 보고: 2026-12-14
 
-## 현재 상태 (2026-10-02 기준)
+## 현재 상태 (2026-10-03 기준)
 
 - ✅ 강화학습 모듈: 환경/보상 3종/PPO+VecNormalize 학습/백테스트 12지표/MVO 비교/
   SHAP/ANOVA(One-way×2, Two-way) 전부 구현, **실제 ETF 10종 데이터로 검증 완료**
@@ -104,8 +104,8 @@
 - ⏳ 동일가중 포트폴리오를 아직 절대수치로는 못 이김 — 원인 추적 중 (관측값에
   drawdown 미포함 등), 과제 스펙의 Why/How 문서화 요구에 맞춰 계속 기록 중
 - ⏳ 데이터팀 실제 수집 파이프라인 대기 중 (연결되면 `rl/data/raw/`에 CSV만 추가)
-- ✅ 리서치·RAG LangGraph형 스텁 (`rag/`: retrieve→tag_risk→summarize, API `/research` 연동) — 실 LLM/벡터스토어는 ⏳
-- ✅ FastAPI/Streamlit/Docker 스켈레톤 확장 (`api/`, `streamlit_app/`, `rag/`, `Dockerfile`) — CI workflow 초안은 로컬 대기(workflow scope)
+- ✅ 리서치·RAG LangGraph형 스텁 확장 (`rag/`: plan→retrieve→tag_risk→verify→summarize, in-memory store, citations, API `/research` 연동) — 실 LLM/Chroma는 ⏳
+- ✅ FastAPI/Streamlit/Docker 스켈레톤 확장 (`api/`, `streamlit_app/`, `rag/`, `Dockerfile`, CI workflow, `docs/report/outline.md`)
 
 ## Notion week-38 submission checklist
 
@@ -118,8 +118,8 @@
 | **Docker placeholder** | ✅ 스켈레톤 | `Dockerfile`, `docker-compose.yml` (api + streamlit) |
 | **Metrics** | ✅ 코드 | `rl/backtest.py::compute_metrics` (12지표), API `GET /backtest` |
 | **ANOVA** | ✅ 코드+API | `rl/stats_tests.py` + API `POST /anova` (합성 시리즈 교육용) |
-| **RAG / LangGraph stub** | ✅ 스텁 | `rag/graph.py` (retrieve→tag_risk→summarize), `/research` 연동 — 실 LLM ⏳ |
-| **CI (GitHub Actions)** | ⏳ 로컬 초안 | `ci.yml` 초안 준비됨 — workflow scope로 푸시 필요 (이 커밋에 미포함) |
+| **RAG / LangGraph stub** | ✅ 스텁 확장 | `rag/graph.py` (plan→retrieve→tag_risk→verify→summarize) + `rag/store.py` (in-memory Chroma-lite) + citations — 실 LLM/Chroma ⏳ |
+| **CI (GitHub Actions)** | ✅ workflow | `.github/workflows/ci.yml` (pytest on push/PR) |
 | **Error analysis** | ⏳ 진행 | Walk-Forward·동일가중 미달 원인 추적 (`rl/README` 한계 6–7) |
 | **Financial disclaimer** | ✅ | 아래 고지 + API/Streamlit 캡션 |
 
@@ -139,7 +139,7 @@ API_BASE_URL=http://127.0.0.1:8000 streamlit run streamlit_app/app.py
 docker compose up --build
 ```
 
-Endpoints: `GET /health`, `POST /optimize`, `POST /explain`, `POST /research` (RAG stub), `GET /backtest`, `POST /anova` (합성 ANOVA).
+Endpoints: `GET /health`, `POST /optimize`, `POST /explain` (artifact JSON or clear stub), `POST /research` (RAG plan/verify + citations), `GET /backtest` (synth SPY/KOSPI + latency_ms), `POST /anova` (합성 ANOVA).
 
 ## Financial disclaimer (필수 고지)
 

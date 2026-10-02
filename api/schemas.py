@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 class HealthResponse(BaseModel):
     status: str = "ok"
     service: str = "robo-advisor-api"
-    version: str = "0.1.0"
+    version: str = "0.1.1"
 
 
 class OptimizeRequest(BaseModel):
@@ -32,12 +32,21 @@ class OptimizeResponse(BaseModel):
     tickers: list[str]
     weights: dict[str, float]
     notes: str = ""
+    latency_ms: float | None = None
 
 
 class ExplainRequest(BaseModel):
     tickers: list[str] = Field(default_factory=lambda: ["SPY", "QQQ", "AGG"])
     asset_index: int = Field(default=0, ge=0, description="Which asset weight to explain")
     top_k: int = Field(default=5, ge=1, le=20)
+    model_path: str | None = Field(
+        default=None,
+        description="Optional SB3 zip under rl/outputs/models; ignored if missing.",
+    )
+    artifact_path: str | None = Field(
+        default=None,
+        description="Optional precomputed SHAP JSON artifact path.",
+    )
 
 
 class FeatureContribution(BaseModel):
@@ -51,12 +60,18 @@ class ExplainResponse(BaseModel):
     top_features: list[FeatureContribution]
     summary: str
     stub: bool = True
+    mode: str = Field(
+        default="stub_pseudo_shap",
+        description="stub_pseudo_shap | artifact_json | shap_kernel_attempted",
+    )
+    latency_ms: float | None = None
 
 
 class ResearchRequest(BaseModel):
     tickers: list[str] = Field(default_factory=lambda: ["SPY", "QQQ", "TLT"])
     query: str = Field(default="market risk outlook", min_length=1)
     n_events_per_ticker: int = Field(default=3, ge=1, le=10)
+    top_k: int = Field(default=5, ge=1, le=20, description="Retrieval top-k from stub store")
 
 
 class RiskTag(BaseModel):
@@ -66,11 +81,33 @@ class RiskTag(BaseModel):
     ts: str
 
 
+class Citation(BaseModel):
+    doc_id: str
+    title: str
+    source: str
+    ticker: str
+    score: float = 0.0
+    snippet: str = ""
+    quote: str = ""
+
+
 class ResearchResponse(BaseModel):
     query: str
     risk_tags: list[RiskTag]
     report_excerpt: str
     stub: bool = True
+    plan: list[str] = Field(default_factory=list)
+    node_trace: list[str] = Field(default_factory=list)
+    citations: list[Citation] = Field(default_factory=list)
+    verify_ok: bool = False
+    verify_notes: list[str] = Field(default_factory=list)
+    env_contract: str = Field(
+        default=(
+            "risk_tags schema {ticker, risk_score[0,1], tag, ts} → "
+            "PortfolioEnv observation axis portfolio_risk (holdings-weighted mean)"
+        )
+    )
+    latency_ms: float | None = None
 
 
 class BacktestRequest(BaseModel):
@@ -78,6 +115,10 @@ class BacktestRequest(BaseModel):
     n_days: int = Field(default=252, ge=20, le=2520)
     seed: int = 0
     include_benchmark: bool = True
+    benchmarks: list[str] = Field(
+        default_factory=lambda: ["spy", "kospi"],
+        description="Logical benchmark names (synthetic when no local CSV).",
+    )
 
 
 class BacktestResponse(BaseModel):
@@ -85,6 +126,12 @@ class BacktestResponse(BaseModel):
     n_days: int
     method: str
     notes: str = ""
+    benchmark_metrics: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    latency_ms: float | None = None
+    latency_notes: str = (
+        "Smoke path is synthetic (no network). Real Walk-Forward / yfinance "
+        "benchmarks add I/O latency; prefer local CSV under rl/data/raw/."
+    )
 
 
 class AnovaRequest(BaseModel):
@@ -108,4 +155,4 @@ class AnovaResponse(BaseModel):
         "Not investment advice; synthetic data ≠ live markets."
     )
     stub: bool = True
-
+    latency_ms: float | None = None

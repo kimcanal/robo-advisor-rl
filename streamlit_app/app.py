@@ -1,15 +1,16 @@
-"""Minimal Streamlit dashboard — API client only (no local model load)."""
+"""Streamlit dashboard — API client only (no local model load)."""
 from __future__ import annotations
 
 import os
 
 import httpx
+import pandas as pd
 import streamlit as st
 
 API_BASE = os.getenv("API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 
-st.set_page_config(page_title="Robo-Advisor Dashboard (stub)", layout="wide")
-st.title("라스트댄스 — Streamlit stub (API only)")
+st.set_page_config(page_title="Robo-Advisor Dashboard", layout="wide")
+st.title("라스트댄스 — Streamlit (API client)")
 st.caption(
     "Educational demo. Not investment advice. Backtests do not guarantee future returns. "
     f"API: `{API_BASE}`"
@@ -43,49 +44,149 @@ def _post(path: str, payload: dict):
 
 
 with tabs[0]:
-    st.subheader("Overview (placeholder)")
+    st.subheader("Overview")
     st.write(
-        "Shell that only talks to FastAPI. "
-        "Wire real charts once backend endpoints return production payloads."
+        "Architecture: **Streamlit → HTTP → FastAPI → rl.* / rag stub** "
+        "(plan → retrieve → tag_risk → verify → summarize)."
     )
-    st.info("Architecture: Streamlit → HTTP → FastAPI → rl.* / rag stub")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("Ping /health", key="ov_hlt"):
+            try:
+                h = _get("/health")
+                st.success(h)
+            except Exception as exc:
+                st.error(f"API call failed: {exc}")
+    with col2:
+        st.markdown("**Env contract**")
+        st.code("{ticker, risk_score[0,1], tag, ts} → PortfolioEnv.portfolio_risk")
+    with col3:
+        st.markdown("**Disclaimer**")
+        st.warning("Synthetic / educational only — not investment advice.")
 
 with tabs[1]:
     st.subheader("Optimize")
     method = st.selectbox("method", ["mvo", "equal"])
+    tickers_txt = st.text_input("tickers (comma)", "SPY,QQQ,AGG")
     if st.button("Run /optimize", key="opt"):
         try:
-            data = _post("/optimize", {"method": method, "lookback_days": 252})
-            st.json(data)
+            tickers = [t.strip() for t in tickers_txt.split(",") if t.strip()]
+            data = _post(
+                "/optimize",
+                {"method": method, "lookback_days": 252, "tickers": tickers},
+            )
+            weights = data.get("weights") or {}
+            st.metric("method", data.get("method", method))
+            if weights:
+                st.bar_chart(pd.Series(weights, name="weight"))
+                st.dataframe(pd.DataFrame([weights]).T.rename(columns={0: "weight"}))
+            if data.get("notes"):
+                st.caption(data["notes"])
+            with st.expander("raw JSON"):
+                st.json(data)
         except Exception as exc:
             st.error(f"API call failed: {exc}")
 
 with tabs[2]:
-    st.subheader("Explain (SHAP stub)")
+    st.subheader("Explain (SHAP path or stub)")
+    asset_index = st.number_input("asset_index", min_value=0, value=0, step=1)
+    top_k = st.slider("top_k", 1, 15, 5)
     if st.button("Run /explain", key="exp"):
         try:
-            data = _post("/explain", {"tickers": ["SPY", "QQQ", "AGG"], "asset_index": 0})
-            st.json(data)
+            data = _post(
+                "/explain",
+                {
+                    "tickers": ["SPY", "QQQ", "AGG"],
+                    "asset_index": int(asset_index),
+                    "top_k": int(top_k),
+                },
+            )
+            st.write(f"**mode:** `{data.get('mode')}` · stub={data.get('stub')} · "
+                     f"latency_ms={data.get('latency_ms')}")
+            st.info(data.get("summary", ""))
+            feats = data.get("top_features") or []
+            if feats:
+                df = pd.DataFrame(feats)
+                st.bar_chart(df.set_index("feature")["contribution"])
+                st.dataframe(df)
+            with st.expander("raw JSON"):
+                st.json(data)
         except Exception as exc:
             st.error(f"API call failed: {exc}")
 
 with tabs[3]:
-    st.subheader("Research (RAG stub)")
+    st.subheader("Research (RAG plan / exec / verify)")
     query = st.text_input("query", "market risk outlook")
+    tickers_r = st.text_input("tickers", "SPY,QQQ,TLT", key="res_tickers")
     if st.button("Run /research", key="res"):
         try:
-            data = _post("/research", {"query": query, "tickers": ["SPY", "QQQ", "TLT"]})
-            st.json(data)
+            tickers = [t.strip() for t in tickers_r.split(",") if t.strip()]
+            data = _post(
+                "/research",
+                {"query": query, "tickers": tickers, "n_events_per_ticker": 2, "top_k": 5},
+            )
+            st.write(
+                f"**verify_ok:** {data.get('verify_ok')} · "
+                f"trace: `{' → '.join(data.get('node_trace') or [])}` · "
+                f"latency_ms={data.get('latency_ms')}"
+            )
+            st.markdown("**Plan**")
+            for step in data.get("plan") or []:
+                st.write(f"- {step}")
+            st.markdown("**Report excerpt**")
+            st.write(data.get("report_excerpt", ""))
+            tags = data.get("risk_tags") or []
+            if tags:
+                st.markdown("**Risk tags (env contract)**")
+                st.dataframe(pd.DataFrame(tags))
+            cites = data.get("citations") or []
+            if cites:
+                st.markdown("**Citations (placeholders)**")
+                st.dataframe(pd.DataFrame(cites))
+            if data.get("verify_notes"):
+                st.caption("verify: " + " | ".join(data["verify_notes"]))
+            st.caption(data.get("env_contract", ""))
+            with st.expander("raw JSON"):
+                st.json(data)
         except Exception as exc:
             st.error(f"API call failed: {exc}")
 
 with tabs[4]:
-    st.subheader("Backtest metrics")
+    st.subheader("Backtest metrics (+ synth SPY/KOSPI)")
     n_days = st.slider("n_days", 60, 504, 252)
+    include_benchmark = st.checkbox("include_benchmark", value=True)
     if st.button("Run /backtest", key="bt"):
         try:
-            data = _get("/backtest", n_days=n_days, seed=0)
-            st.json(data)
+            data = _get(
+                "/backtest",
+                n_days=n_days,
+                seed=0,
+                include_benchmark=include_benchmark,
+                benchmarks="spy,kospi",
+            )
+            st.write(
+                f"**method:** `{data.get('method')}` · latency_ms={data.get('latency_ms')}"
+            )
+            metrics = data.get("metrics") or {}
+            if metrics:
+                cols = st.columns(min(4, len(metrics)))
+                for i, key in enumerate(["sharpe", "mdd", "cagr", "ann_vol"]):
+                    if key in metrics and metrics[key] is not None:
+                        cols[i % 4].metric(key, f"{metrics[key]:.4f}")
+                st.dataframe(pd.DataFrame([metrics]).T.rename(columns={0: "value"}))
+            bench = data.get("benchmark_metrics") or {}
+            if bench:
+                st.markdown("**Benchmark metrics (synthetic)**")
+                rows = []
+                for name, m in bench.items():
+                    row = {"benchmark": name}
+                    row.update(m)
+                    rows.append(row)
+                st.dataframe(pd.DataFrame(rows))
+            st.caption(data.get("notes", ""))
+            st.caption(data.get("latency_notes", ""))
+            with st.expander("raw JSON"):
+                st.json(data)
         except Exception as exc:
             st.error(f"API call failed: {exc}")
 
@@ -97,7 +198,11 @@ with tabs[5]:
     if st.button("Run /anova", key="anova"):
         try:
             data = _post("/anova", {"mode": mode, "n_obs": n_obs, "seed": 0})
-            st.json(data)
+            st.write(f"**groups:** {', '.join(data.get('groups') or [])}")
+            st.json(data.get("result") or {})
+            st.caption(data.get("notes", ""))
+            with st.expander("raw JSON"):
+                st.json(data)
         except Exception as exc:
             st.error(f"API call failed: {exc}")
 
