@@ -107,6 +107,20 @@ python -m pytest rl/tests -v
 
 재현: `python3 -c "from rl.regime import load_spy_regime; ..."` (기간별 `.value_counts()` 확인)
 
+### 코드 감사 이력 (참고 프로젝트 교차검증)
+
+`Dynamic_Regime_Portfolio-luca`의 자체 코드 감사 문서(`Code Weakness.md`)에 나온
+패턴들을 우리 코드에도 있는지 하나씩 대조해봄:
+
+| 패턴 | 우리 코드 상태 | 조치 |
+|---|---|---|
+| 거래비용 이중/과다 계산 | turnover가 매도+매수를 중복 계산(2배) — **있었음** | 수정 완료 (`/2.0`) |
+| 무위험이자율 하드코딩 | 0으로 고정 — **있었음** | 수정 완료 (BIL 실제값) |
+| 전체 기간 데이터로 스케일러 fit (look-ahead) | MACD를 train/test 분할 전에 전체 기간으로 z-score — **있었음** | 수정 완료 (VecNormalize가 학습 데이터만으로 대체) |
+| 비용 이중 차감(Double Penalty) | 코드 흐름상 1회만 차감 — **없음** | 조치 불필요, 확인만 |
+| Sharpe/Information Ratio 계산식 오류 | 독립적으로 유도된 두 공식이 대수적으로 동일함을 확인 | 조치 불필요, 검증됨 |
+| Grid Search 단일기간 최적화(과적합 위험) | lambda/window sweep이 단일 분할만 사용 — **있음** | 한계점 7번에 기록, 미수정(시간 제약) |
+
 ## 남은 실험 (리포트 "실험" 섹션 근거 자료 생성용)
 
 과제 스펙이 명시적으로 요구하는 두 실험을 `rl/experiments.py`에 자동화해뒀다.
@@ -144,3 +158,8 @@ python -m rl.experiments --which window --timesteps 15000
 6. 관측 공간에 "현재 낙폭(drawdown)"이 빠져있음. mdd_penalty 보상이 낙폭에
    페널티를 주는데 정작 에이전트는 자기 낙폭 상태를 직접 볼 수 없어서, Safe-Guard를
    피하라고 학습시키기 어려운 구조적 한계로 보임 — 다음 개선 후보.
+7. `experiments.py`의 lambda_sweep/window_sweep은 **단일 train/test 분할**로만
+   최적값(lambda=1.0, window=30)을 선택 중 — 그 분할 구간에 과적합(curve-fitting)됐을
+   위험이 있음. Walk-Forward처럼 여러 구간에 교차검증해야 더 엄밀하지만 아직 안 함
+   (참고 프로젝트의 "Grid Search가 단일 기간 최적화만 해서 데이터마이닝 편향이 있다"는
+   자체 지적과 동일한 한계).
