@@ -101,11 +101,16 @@
 - ✅ Walk-Forward(`walk_forward.py`)에 VecNormalize 적용·증분 CSV 저장·BIL/피처래그/
   베이스라인 수수료 공정성 반영. 기존 발표 수치는 구버전일 수 있으므로 Colab
   `colab_run.ipynb`로 재실행한 결과를 최종으로 쓸 것
+- ✅ Colab `colab_run.ipynb`: 매 실행 `master` 신규 클론 → data(BIL/`SPY_ohlcv`) →
+  데모 또는 풀 WF(≥100k×3보상×≥2윈도우) → 12지표(EW/MVO/SPY/KOSPI) → ANOVA →
+  SHAP → risk-tag 스텁 → 결과 다운로드. GPU 불필요. Notion week-38 체크리스트 매핑 포함.
+- ✅ 리스크 태그 스텁(`rl/risk_tags.py`) + SPY/KOSPI 벤치마크가 WF 비교표에 포함 (PR#2)
 - ⏳ 동일가중 포트폴리오를 아직 절대수치로는 못 이김 — 원인 추적 중 (관측값에
   drawdown 미포함 등), 과제 스펙의 Why/How 문서화 요구에 맞춰 계속 기록 중
 - ⏳ 데이터팀 실제 수집 파이프라인 대기 중 (연결되면 `rl/data/raw/`에 CSV만 추가)
 - ✅ 리서치·RAG LangGraph형 스텁 확장 (`rag/`: plan→retrieve→tag_risk→verify→summarize, in-memory store, citations, API `/research` 연동) — 실 LLM/Chroma는 ⏳
 - ✅ FastAPI/Streamlit/Docker 스켈레톤 확장 (`api/`, `streamlit_app/`, `rag/`, `Dockerfile`, CI workflow, `docs/report/outline.md`)
+- ✅ 리스크 태그 → `PortfolioEnv.portfolio_risk` 배선 데모 API (`POST /risk-tags/apply`) — 교육용 스텁
 
 ## Notion week-38 submission checklist
 
@@ -119,6 +124,8 @@
 | **Metrics** | ✅ 코드 | `rl/backtest.py::compute_metrics` (12지표), API `GET /backtest` |
 | **ANOVA** | ✅ 코드+API | `rl/stats_tests.py` + API `POST /anova` (합성 시리즈 교육용) |
 | **RAG / LangGraph stub** | ✅ 스텁 확장 | `rag/graph.py` (plan→retrieve→tag_risk→verify→summarize) + `rag/store.py` (in-memory Chroma-lite) + citations — 실 LLM/Chroma ⏳ |
+| **Risk-tag wiring** | ✅ 스텁 API | `POST /risk-tags/apply` → `rl.risk_tags.risk_score_panel` + short `PortfolioEnv` obs (`portfolio_risk`) |
+| **Performance targets** | ✅ 체크리스트 | `docs/performance_targets.md` (Colab 수치 placeholder) |
 | **CI (GitHub Actions)** | ✅ workflow | `.github/workflows/ci.yml` (pytest on push/PR) |
 | **Error analysis** | ⏳ 진행 | Walk-Forward·동일가중 미달 원인 추적 (`rl/README` 한계 6–7) |
 | **Financial disclaimer** | ✅ | 아래 고지 + API/Streamlit 캡션 |
@@ -139,7 +146,18 @@ API_BASE_URL=http://127.0.0.1:8000 streamlit run streamlit_app/app.py
 docker compose up --build
 ```
 
-Endpoints: `GET /health`, `POST /optimize`, `POST /explain` (artifact JSON or clear stub), `POST /research` (RAG plan/verify + citations), `GET /backtest` (synth SPY/KOSPI + latency_ms), `POST /anova` (합성 ANOVA).
+Endpoints: `GET /health`, `POST /optimize`, `POST /explain` (artifact JSON or clear stub), `POST /research` (RAG plan/verify + citations), `POST /risk-tags/apply` (panel + env obs wiring), `GET /backtest` (synth SPY/KOSPI + latency_ms), `POST /anova` (합성 ANOVA).
+
+## Colab 재검증 (Notion week-38)
+
+[`colab_run.ipynb`](colab_run.ipynb) — Open in Colab 배지로 실행.
+
+1. Setup: `rm -rf` 후 `master` 클론 + `rl/requirements.txt`
+2. Data: `fetch_real_data` + **BIL / SPY_ohlcv / risk-free 상태 큰 출력**
+3. Train: 짧은 `run_demo` **또는** 풀 `walk_forward --real --timesteps 120000` (≥100k, 보상 3종, ≥2 윈도우; 증분 CSV)
+4. Metrics / ANOVA / SHAP / risk-tag 스텁 / 결과 다운로드 (`Path.exists` 가드)
+
+**Disclaimer:** 교육·연구 목적. 백테스트 ≠ 미래 수익. 투자 자문 아님.
 
 ## Financial disclaimer (필수 고지)
 
