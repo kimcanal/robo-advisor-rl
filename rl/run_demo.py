@@ -66,7 +66,7 @@ def main(n_assets=6, window=WINDOW_SIZE, timesteps=8000, test_days=252, tickers=
             filename=str(monitor_path),
         )
         train_venv = make_train_vecnorm(train_env_fn)
-        model = PPO("MlpPolicy", train_venv, verbose=0, seed=0)
+        model = PPO("MlpPolicy", train_venv, verbose=0, seed=0, device="cpu")
         model.learn(total_timesteps=timesteps)
         _plot_learning_curve(monitor_path, rt)
 

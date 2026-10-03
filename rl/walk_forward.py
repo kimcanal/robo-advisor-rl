@@ -128,7 +128,8 @@ def run(
                     reward_type=rt, reward_kwargs=reward_kwargs,
                 )
                 train_venv = make_train_vecnorm(train_env_fn)
-                model = PPO("MlpPolicy", train_venv, verbose=0, seed=seed)
+                # device=cpu skips CUDA probe; Colab also needs triton uninstalled (torch/_dynamo) — see colab_run.ipynb.
+                model = PPO("MlpPolicy", train_venv, verbose=0, seed=seed, device="cpu")
                 model.learn(total_timesteps=timesteps)
 
                 test_env_fn = lambda rt=rt, reward_kwargs=reward_kwargs: PortfolioEnv(

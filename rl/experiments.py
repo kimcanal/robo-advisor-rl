@@ -43,7 +43,7 @@ def _train_and_eval(train_data, test_data, window, reward_type, reward_kwargs, t
         *train_data, window=window, reward_type=reward_type, reward_kwargs=reward_kwargs
     )
     train_venv = make_train_vecnorm(train_env_fn)
-    model = PPO("MlpPolicy", train_venv, verbose=0, seed=seed)
+    model = PPO("MlpPolicy", train_venv, verbose=0, seed=seed, device="cpu")
     model.learn(total_timesteps=timesteps)
 
     test_env_fn = lambda reward_type=reward_type, reward_kwargs=reward_kwargs: PortfolioEnv(

@@ -10,7 +10,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 COPY rl/requirements.txt /app/rl/requirements.txt
 COPY requirements-api.txt /app/requirements-api.txt
 
-# RL stack is heavy; install API deps first, then RL (torch CPU via pip default).
+# RL stack is heavy; install API deps first, then RL.
+# torch CPU comes from rl/requirements.txt (pytorch.org/whl/cpu). PyPI torch is CUDA.
 RUN pip install --upgrade pip \
     && pip install -r /app/requirements-api.txt \
     && pip install -r /app/rl/requirements.txt

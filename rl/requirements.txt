@@ -1,6 +1,15 @@
 gymnasium==1.3.0
 stable-baselines3==2.9.0
-torch==2.14.0
+# PyPI's Linux torch==2.14.0 wheel is CUDA 13.0 (depends on cuda-toolkit==13.0.3
+# and nvidia-*-cu13). Colab's CPU image still ships CUDA 12 libs / libcuda; mixing
+# them SIGSEGVs (exit 139, no traceback) inside PPO() when SB3 probes
+# torch.cuda.is_available() — after the walk-forward window header, before any
+# seed log line. CPU wheels are not on PyPI; +cpu is only on the pytorch index.
+# Gymnasium is the env API. Do not install the unmaintained `gym` package:
+# Colab preinstalls it, and under NumPy 2 it only warns ("does not support NumPy 2.0")
+# but its import is not on this code path.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.0+cpu
 pandas==3.0.6
 # numpy/scipy/shap 2.5+/1.18+/0.52+ need Python >=3.12 (Colab / Docker 3.12).
 # GHA ci.yml is still on 3.11 (OAuth token lacks `workflow` scope to bump the
