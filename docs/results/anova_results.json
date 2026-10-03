@@ -1,0 +1,181 @@
+{
+  "source": "docs/results/walk_forward_results_16assets_2015.csv",
+  "alpha": 0.05,
+  "validation1_reward_oneway": {
+    "f_stat": 0.17168867412627073,
+    "p_value": 0.842653651963935,
+    "eta_squared": 0.005690389953993604,
+    "df_between": 2,
+    "df_within": 60,
+    "n_per_group": {
+      "drl_simple": 21,
+      "drl_sharpe": 21,
+      "drl_mdd_penalty": 21
+    },
+    "group_means": {
+      "drl_simple": -0.007895043979910829,
+      "drl_sharpe": 0.014178361141955505,
+      "drl_mdd_penalty": -0.0034689006758056914
+    },
+    "significant": false,
+    "tukey_required": false,
+    "metric": "cumulative_return",
+    "design": "one-way, 7 windows x 3 seeds pooled per reward"
+  },
+  "validation1_reward_oneway_sharpe": {
+    "f_stat": 0.009364000259312262,
+    "p_value": 0.9906811529520434,
+    "eta_squared": 0.00031203594515469567,
+    "df_between": 2,
+    "df_within": 60,
+    "n_per_group": {
+      "drl_simple": 21,
+      "drl_sharpe": 21,
+      "drl_mdd_penalty": 21
+    },
+    "group_means": {
+      "drl_simple": -0.7147702151936867,
+      "drl_sharpe": -0.6579961188628319,
+      "drl_mdd_penalty": -0.747760079665054
+    },
+    "significant": false,
+    "tukey_required": false,
+    "metric": "sharpe",
+    "design": "one-way, 7 windows x 3 seeds pooled per reward"
+  },
+  "validation1_reward_blocked_by_window": {
+    "metric": "cumulative_return",
+    "design": "two-way additive (reward + window block), supplementary",
+    "table": [
+      {
+        "term": "C(strategy)",
+        "sum_sq": 0.005727762655209915,
+        "df": 2.0,
+        "F": 3.2247116341675524,
+        "p_value": 0.047538245432826726,
+        "eta_squared": 0.005690389953993669
+      },
+      {
+        "term": "C(window)",
+        "sum_sq": 0.9528822746020631,
+        "df": 6.0,
+        "F": 178.82320095243196,
+        "p_value": 8.72478600749077e-34,
+        "eta_squared": 0.946664875822355
+      },
+      {
+        "term": "Residual",
+        "sum_sq": 0.0479576499343607,
+        "df": 54.0,
+        "F": null,
+        "p_value": null,
+        "eta_squared": 0.047644734223651224
+      }
+    ],
+    "reward_p_value": 0.047538245432826726,
+    "tukey_required": true,
+    "tukey_records_window_centered": [
+      {
+        "group1": "drl_mdd_penalty",
+        "group2": "drl_sharpe",
+        "meandiff": 0.0176,
+        "p_adj": 0.1155,
+        "lower": -0.0033,
+        "upper": 0.0386,
+        "reject": false
+      },
+      {
+        "group1": "drl_mdd_penalty",
+        "group2": "drl_simple",
+        "meandiff": -0.0044,
+        "p_adj": 0.8681,
+        "lower": -0.0254,
+        "upper": 0.0165,
+        "reject": false
+      },
+      {
+        "group1": "drl_sharpe",
+        "group2": "drl_simple",
+        "meandiff": -0.0221,
+        "p_adj": 0.0369,
+        "lower": -0.043,
+        "upper": -0.0011,
+        "reject": true
+      }
+    ],
+    "tukey_note": "Approximate post-hoc on window-centered values; df not adjusted for the window block. Treat as descriptive."
+  },
+  "validation1_excluding_truncated": {
+    "f_stat": 0.5569633750402381,
+    "p_value": 0.5772201000081912,
+    "eta_squared": 0.026450317888686275,
+    "df_between": 2,
+    "df_within": 41,
+    "n_per_group": {
+      "drl_simple": 15,
+      "drl_sharpe": 15,
+      "drl_mdd_penalty": 14
+    },
+    "group_means": {
+      "drl_simple": 0.0562842863273669,
+      "drl_sharpe": 0.08446894368348717,
+      "drl_mdd_penalty": 0.07785302446943605
+    },
+    "significant": false,
+    "tukey_required": false,
+    "metric": "cumulative_return",
+    "design": "one-way, 7 windows x 3 seeds pooled per reward"
+  },
+  "validation2_strategy_oneway": {
+    "f_stat": 2.5841703252996657,
+    "p_value": 0.09112318436532656,
+    "eta_squared": 0.1390522299390299,
+    "df_between": 2,
+    "df_within": 32,
+    "n_per_group": {
+      "drl_mdd_penalty": 21,
+      "mvo": 7,
+      "equal_weight": 7
+    },
+    "group_means": {
+      "drl_mdd_penalty": -0.0034689006758056914,
+      "mvo": 0.09395930002208681,
+      "equal_weight": 0.10149360097858597
+    },
+    "significant": false,
+    "tukey_required": false,
+    "metric": "cumulative_return",
+    "drl_group": "drl_mdd_penalty"
+  },
+  "validation2_excluding_truncated_windows": {
+    "f_stat": 1.0717941798718578,
+    "p_value": 0.3644327353537469,
+    "eta_squared": 0.11197421922482317,
+    "df_between": 2,
+    "df_within": 17,
+    "n_per_group": {
+      "drl_mdd_penalty": 12,
+      "mvo": 4,
+      "equal_weight": 4
+    },
+    "group_means": {
+      "drl_mdd_penalty": 0.0851940736960165,
+      "mvo": 0.1474286220639395,
+      "equal_weight": 0.144373457710108
+    },
+    "significant": false,
+    "tukey_required": false,
+    "metric": "cumulative_return",
+    "drl_group": "drl_mdd_penalty"
+  },
+  "validation3_strategy_x_regime": {
+    "status": "not_reproducible_here",
+    "reason": "walk_forward_daily.csv is not committed; two-way ANOVA needs daily returns with regime labels. Re-run rl.walk_forward and pass --daily.",
+    "reported_in_pr7": {
+      "strategy_p_value": 0.013,
+      "strategy_eta_squared_upper_bound": 0.001,
+      "source": "docs/rl_status_2026-10-04.md (Colab console output, F not recorded)"
+    }
+  },
+  "kospi": "SKIP in all windows (download failed in Colab; no KOSPI rows in CSV)"
+}

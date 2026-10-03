@@ -16,6 +16,10 @@ REQUIRED_PATHS = {
     "/backtest",
     "/anova",
     "/risk-tags/apply",
+    "/anova/results",
+    "/training/curves",
+    "/portfolio/history",
+    "/artifacts/file",
 }
 
 
