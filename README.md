@@ -50,8 +50,9 @@
 ┌─────────────────────────────────────────────┐
 │  임소현: 백엔드·화면                            │
 │  FastAPI (/health /optimize /explain          │
-│           /research /backtest)                │
-│  Streamlit 6탭 (API 통신만, 모델 직접 로드 금지)  │
+│           /research /risk-tags/apply          │
+│           /backtest /anova)                   │
+│  Streamlit 8탭 (API 통신만, 모델 직접 로드 금지)  │
 └─────────────────────────────────────────────┘
 ```
 
@@ -88,7 +89,7 @@
 - 중간 보고: 2026-11-09 주
 - 완료 보고: 2026-12-14
 
-## 현재 상태 (2026-10-02 기준)
+## 현재 상태 (2026-10-03 기준)
 
 - ✅ 강화학습 모듈: 환경/보상 3종/PPO+VecNormalize 학습/백테스트 12지표/MVO 비교/
   SHAP/ANOVA(One-way×2, Two-way) 전부 구현, **실제 ETF 10종 데이터로 검증 완료**
@@ -105,11 +106,47 @@
   데모 또는 풀 WF(≥100k×3보상×≥2윈도우) → 12지표(EW/MVO/SPY/KOSPI) → ANOVA →
   SHAP → risk-tag 스텁 → 결과 다운로드. GPU 불필요. Notion week-38 체크리스트 매핑 포함.
 - ✅ 리스크 태그 스텁(`rl/risk_tags.py`) + SPY/KOSPI 벤치마크가 WF 비교표에 포함 (PR#2)
-- ⏳ 동일가중 포트폴리오를 아직 절대수치로는 못 이김 — 원인 추적 중 (관측값에
-  drawdown 미포함 등), 과제 스펙의 Why/How 문서화 요구에 맞춰 계속 기록 중
+- ⏳ 동일가중 포트폴리오를 아직 절대수치로는 못 이김 — 가설·검증 절차는
+  `docs/error_analysis.md`에 구조화 (관측 drawdown 미포함 등). **수치는 Colab WF 후**
 - ⏳ 데이터팀 실제 수집 파이프라인 대기 중 (연결되면 `rl/data/raw/`에 CSV만 추가)
-- ⏳ 리서치·RAG 실시간 태그 연동 (스키마/관측 축은 스텁으로 준비됨)
-- ⏳ FastAPI/Streamlit/Docker는 백엔드팀 담당 (별도 PR 스켈레톤 가능)
+- ✅ 리서치·RAG LangGraph형 스텁 확장 (`rag/`: plan→retrieve→tag_risk→verify→summarize, in-memory store, citations, API `/research` 연동) — 실 LLM/Chroma는 ⏳
+- ✅ FastAPI/Streamlit/Docker 스켈레톤 확장 (`api/`, `streamlit_app/`, `rag/`, `Dockerfile`, CI workflow, `docs/report/outline.md`)
+- ✅ 리스크 태그 → `PortfolioEnv.portfolio_risk` 배선 데모 API (`POST /risk-tags/apply`) — 교육용 스텁
+
+## Notion week-38 submission checklist
+
+팀 Notion 제출/중간 점검용 체크리스트. 세부 구현은 담당 모듈 README를 따른다.
+
+| 섹션 | 상태 | 어디에 있나 |
+|---|---|---|
+| **Architecture** | ✅ 문서화 | `docs/architecture.md` (mermaid flowchart) + 위 다이어그램 + 역할 인터페이스 계약 |
+| **Reward rationale** | ✅ 문서화 | `docs/reward_rationale.md` + `rl/README.md` (simple / sharpe / mdd_penalty, Safe-Guard, VecNormalize; Colab TODO) |
+| **Docker placeholder** | ✅ 스켈레톤 | `Dockerfile`, `docker-compose.yml` (api healthcheck + streamlit depends_on healthy), `Makefile` (test/api/streamlit/smoke/compose/fmt-check) |
+| **Metrics** | ✅ 코드 | `rl/backtest.py::compute_metrics` (12지표), API `GET /backtest` |
+| **ANOVA** | ✅ 코드+API | `rl/stats_tests.py` + API `POST /anova` (합성 시리즈 교육용) |
+| **RAG / LangGraph stub** | ✅ 스텁 확장 | `rag/` plan→…→summarize + richer seed corpus + `RAG_TOP_K`/`RAG_STUB_FORCE`/`RAG_COLLECTION` (`.env.example`) — 실 LLM/Chroma ⏳; 응답 `stub: true` |
+| **Risk-tag wiring** | ✅ 스텁 API | `POST /risk-tags/apply` → `rl.risk_tags.risk_score_panel` + short `PortfolioEnv` obs (`portfolio_risk`) |
+| **Performance targets** | ✅ 체크리스트 | `docs/performance_targets.md` (Colab 수치 placeholder) |
+| **CI (GitHub Actions)** | ✅ workflow + pin note | `.github/workflows/ci.yml` (pytest). Docker `python:3.12-slim`. GHA still 3.11 + `rl/requirements.txt` env markers for numpy/scipy/shap — see `docs/ci_python_note.md` (workflow bump needs `workflow` scope) |
+| **Error analysis** | ✅ 구조화 (수치 ⏳) | `docs/error_analysis.md` (H1–H8 hypotheses, WF CSV read-out) + `rl/README` 한계 6–7 — **Colab 숫자는 Yunha** |
+| **Financial disclaimer** | ✅ | 아래 고지 + API/Streamlit 캡션 |
+| **Report outline (~20p)** | ✅ skeleton | `docs/report/outline.md` (page budget + App D) |
+| **Morning review (Yunha)** | ✅ | `docs/morning_review.md`, `docs/notion_submission_map.md`, `docs/submission_checklist.md` (one-pager) |
+
+### API / UI quick start
+
+```bash
+source .venv/bin/activate
+pip install -r rl/requirements.txt -r requirements-api.txt
+
+# Convenience (optional)
+make test
+make api          # Swagger: http://127.0.0.1:8000/docs
+make streamlit    # API만 호출, 모델 직접 로드 금지
+make compose-up   # api healthcheck + streamlit
+```
+
+Endpoints: `GET /health` (version + educational + `endpoints` list), `POST /optimize`, `POST /explain` (artifact JSON or clear stub), `POST /research` (RAG plan/verify + citations), `POST /risk-tags/apply` (panel + env obs wiring), `GET /backtest` (synth SPY/KOSPI + latency_ms), `POST /anova` (합성 ANOVA).
 
 ## Colab 재검증 (Notion week-38)
 
@@ -121,3 +158,13 @@
 4. Metrics / ANOVA / SHAP / risk-tag 스텁 / 결과 다운로드 (`Path.exists` 가드)
 
 **Disclaimer:** 교육·연구 목적. 백테스트 ≠ 미래 수익. 투자 자문 아님.
+
+## Financial disclaimer (필수 고지)
+
+**본 저장소는 교육·연구 목적의 데모입니다. 투자 자문이 아니며, 특정 증권의 매수·매도를 권유하지 않습니다.**
+
+- 백테스트·시뮬레이션 성과는 **과거 데이터(또는 합성 데이터)에 기반**하며 **미래 수익을 보장하지 않습니다** (backtests ≠ future returns).
+- 거래비용·슬리피지·유동성·세금·survivorship 등 실전 제약이 단순화되어 있을 수 있습니다.
+- API 키(`.env.example`)와 Docker 스택은 로컬 실험용이며, 라이브 브로커 연동은 기본 비활성입니다.
+- 실제 투자 결정은 본인 책임이며, 필요 시 자격 있는 전문가와 상담하세요.
+

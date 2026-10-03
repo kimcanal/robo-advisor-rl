@@ -1,0 +1,11 @@
+# Light-touch lint for api/ + streamlit_app/ (do not rewrite RL style overnight).
+target-version = "py311"
+line-length = 100
+
+[lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[lint.per-file-ignores]
+"rl/**" = ["E", "F", "I", "W"]
+"colab_run.ipynb" = ["E", "F", "I", "W"]
