@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 class HealthResponse(BaseModel):
     status: str = "ok"
     service: str = "robo-advisor-api"
-    version: str = "0.1.5"
+    version: str = "0.2.0"
     educational: bool = True
     disclaimer: str = (
         "Educational demo only — not investment advice; backtests ≠ future returns."
@@ -17,6 +17,10 @@ class HealthResponse(BaseModel):
     endpoints: list[str] = Field(
         default_factory=list,
         description="Public route paths for graders / smoke clients.",
+    )
+    models: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Trained DRL policy / SHAP / results artifact status (model load state).",
     )
 
 
@@ -29,10 +33,24 @@ class OptimizeRequest(BaseModel):
     )
     method: str = Field(
         default="mvo",
-        description="Optimization method: 'mvo' (Markowitz) or 'equal' (1/N).",
+        description=(
+            "'drl' (trained PPO policy, seed ensemble), 'mvo' (Markowitz) or 'equal' (1/N). "
+            "For 'drl' the asset universe is fixed by the trained model."
+        ),
     )
     lookback_days: int = Field(default=252, ge=30, le=1260)
     objective: str = Field(default="max_sharpe", description="mvo objective")
+    prices: dict[str, list[float]] | None = Field(
+        default=None,
+        description=(
+            "Current market data: adjusted close per ticker, oldest first, same length as "
+            "`dates`. For 'drl' send >= window+40 rows for every model ticker."
+        ),
+    )
+    dates: list[str] | None = Field(default=None, description="ISO dates for `prices` rows.")
+    current_weights: dict[str, float] | None = Field(
+        default=None, description="Currently held weights (DRL observation input); default 1/N."
+    )
 
 
 class OptimizeResponse(BaseModel):
@@ -41,11 +59,23 @@ class OptimizeResponse(BaseModel):
     weights: dict[str, float]
     notes: str = ""
     latency_ms: float | None = None
+    data_source: str = Field(
+        default="",
+        description="prices | snapshot | local_csv | dummy | synthetic | none",
+    )
+    as_of: str | None = None
+    stub: bool = Field(default=False, description="True when weights are not from real data.")
+    model: dict[str, Any] | None = None
+    per_seed: dict[str, dict[str, float]] | None = None
 
 
 class ExplainRequest(BaseModel):
     tickers: list[str] = Field(default_factory=lambda: ["SPY", "QQQ", "AGG"])
     asset_index: int = Field(default=0, ge=0, description="Which asset weight to explain")
+    decision: str | None = Field(
+        default=None,
+        description="Main-model SHAP decision label: last_decision | worst_day | safe_guard.",
+    )
     top_k: int = Field(default=5, ge=1, le=20)
     model_path: str | None = Field(
         default=None,
@@ -69,10 +99,19 @@ class ExplainResponse(BaseModel):
     summary: str
     stub: bool = True
     mode: str = Field(
-        default="stub_pseudo_shap",
-        description="stub_pseudo_shap | artifact_json | shap_kernel_attempted",
+        default="unavailable",
+        description="main_model_shap | artifact_json | unavailable",
     )
     latency_ms: float | None = None
+    as_of: str | None = None
+    base_value: float | None = None
+    prediction: float | None = None
+    run_tag: str | None = None
+    plots: dict[str, str] = Field(
+        default_factory=dict, description="name -> GET /artifacts/file path for PNGs"
+    )
+    decisions: list[str] = Field(default_factory=list)
+    global_importance: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ResearchRequest(BaseModel):
@@ -147,6 +186,12 @@ class BacktestResponse(BaseModel):
     metrics: dict[str, Any]
     n_days: int
     method: str
+    source: str = Field(default="synthetic", description="walk_forward | synthetic")
+    windows: list[dict[str, Any]] = Field(default_factory=list)
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+    truncated_rows: list[dict[str, Any]] = Field(default_factory=list)
+    targets: dict[str, Any] = Field(default_factory=dict)
+    kospi_status: str | None = None
     notes: str = ""
     benchmark_metrics: dict[str, dict[str, Any]] = Field(default_factory=dict)
     latency_ms: float | None = None
@@ -219,3 +264,12 @@ class RiskTagsApplyResponse(BaseModel):
     )
     latency_ms: float | None = None
 
+
+
+class ArtifactPayload(BaseModel):
+    """Generic read-only artifact response (results JSON / curves / history)."""
+
+    available: bool
+    source: str = ""
+    data: dict[str, Any] | list[Any] | None = None
+    reason: str | None = None

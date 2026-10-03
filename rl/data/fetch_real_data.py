@@ -3,7 +3,8 @@ CSV로 저장한다. 조윤상님의 정식 데이터 파이프라인이 아니�
 실제 시장 데이터로 빠르게 시험해보기 위한 임시 스크립트.
 
 사용:
-    python -m rl.data.fetch_real_data
+    python -m rl.data.fetch_real_data                       # 10종, 2019-01-01~
+    python -m rl.data.fetch_real_data --universe 16 --start 2015-01-01   # PR #7 설정
 
 저장물:
   - data/raw/{ticker}.csv          : Date, Close (자산 + BIL)
@@ -31,6 +32,9 @@ TICKERS = [
     "GLD",  # 금
     "VNQ",  # 리츠(부동산)
 ]
+
+# PR #7(16종목) 실행에 쓴 추가 6종
+EXTRA_6 = ["DIA", "VEA", "BND", "LQD", "SLV", "TIP"]
 
 # 무위험이자율 프록시 — 자산 유니버스에는 넣지 않고 별도 CSV로만 저장
 RISK_FREE_TICKER = "BIL"
@@ -79,5 +83,31 @@ def fetch(tickers=TICKERS, start="2019-01-01", end=None):
     return tickers
 
 
+def fetch_kospi(start="2019-01-01", end=None) -> Path | None:
+    """KOSPI 지수를 rl/benchmarks의 다중 소스로 받아 KS11.csv로 저장. 실패하면 원인을 출력."""
+    from ..benchmarks import KOSPI_ATTEMPTS, BenchmarkDownloadError, _load_kospi_remote
+
+    end = end or pd.Timestamp.today().strftime("%Y-%m-%d")
+    try:
+        s = _load_kospi_remote(start, end)
+    except BenchmarkDownloadError as e:
+        print(f"[fetch] KOSPI FAILED: {e}")
+        return None
+    finally:
+        for a in KOSPI_ATTEMPTS:
+            print(f"[fetch] KOSPI attempt {a}")
+    return _save_close_csv(s, "KS11")
+
+
 if __name__ == "__main__":
-    fetch()
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--universe", choices=["10", "16"], default="10")
+    ap.add_argument("--start", default="2019-01-01")
+    ap.add_argument("--end", default=None)
+    ap.add_argument("--no-kospi", action="store_true")
+    a = ap.parse_args()
+    fetch(TICKERS + (EXTRA_6 if a.universe == "16" else []), start=a.start, end=a.end)
+    if not a.no_kospi:
+        fetch_kospi(start=a.start, end=a.end)

@@ -18,6 +18,21 @@ from rl.benchmarks import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _no_network_kospi_sources(monkeypatch):
+    """pykrx / FDR / data.go.kr는 테스트에서 네트워크를 타지 않게 실패로 고정."""
+    import rl.benchmarks as bm
+
+    def _fail(name):
+        def f(start, end):
+            raise RuntimeError(f"{name} disabled in tests")
+        return f
+
+    monkeypatch.setattr(bm, "_kospi_pykrx", _fail("pykrx"))
+    monkeypatch.setattr(bm, "_kospi_fdr", _fail("fdr"))
+    monkeypatch.setattr(bm, "_kospi_data_go_kr", _fail("data.go.kr"))
+
+
 def test_synthetic_series_metrics_have_12_keys():
     idx = pd.bdate_range("2020-01-01", periods=252)
     spy = synthetic_benchmark_returns(idx, seed=0, name="spy")
@@ -138,27 +153,23 @@ def test_spy_required_still_raises_when_missing(tmp_path: Path, monkeypatch):
     assert "필수" in str(ei.value) or "fail" in str(ei.value)
 
 
-def test_kospi_multi_ticker_falls_back_to_ewy(monkeypatch):
-    """^KS11 / KS11 fail → EWY succeeds."""
+def test_kospi_uses_ks11_after_other_sources_fail(monkeypatch):
+    """pykrx / FDR / data.go.kr 실패 → yfinance ^KS11 성공. EWY 프록시는 쓰지 않는다."""
     import rl.benchmarks as bm
 
     idx = pd.bdate_range("2020-01-01", periods=30)
     prices = pd.Series(
         100 * np.exp(np.cumsum(np.random.default_rng(1).normal(0.0004, 0.012, size=len(idx)))),
         index=idx,
-        name="EWY",
+        name="^KS11",
     )
+    asked = []
 
     def fake_yf(tickers, start, end):
-        last = None
-        for t in tickers:
-            if t in ("^KS11", "KS11"):
-                last = RuntimeError("%s: empty download" % t)
-                continue
-            if t == "EWY":
-                return prices.loc[start:end]
-            last = RuntimeError("%s: unknown" % t)
-        raise BenchmarkDownloadError("fail: %s" % last)
+        asked.extend(tickers)
+        if "^KS11" in tickers:
+            return prices.loc[start:end]
+        raise BenchmarkDownloadError("unexpected %s" % (tickers,))
 
     monkeypatch.setattr(bm, "_from_yfinance", fake_yf)
     rets = load_benchmark_returns(
@@ -166,7 +177,28 @@ def test_kospi_multi_ticker_falls_back_to_ewy(monkeypatch):
         data_dir=Path("/nonexistent-bench-dir-xyz"), allow_download=True,
     )
     assert len(rets) > 5
-    assert rets.name == "EWY"
+    assert "EWY" not in asked
+    sources = [a["source"] for a in bm.KOSPI_ATTEMPTS]
+    assert sources == ["pykrx", "FinanceDataReader", "data.go.kr", "yfinance ^KS11"]
+    assert bm.KOSPI_ATTEMPTS[-1]["ok"] is True
+    assert all(a["ok"] is False and a["error"] for a in bm.KOSPI_ATTEMPTS[:3])
+
+
+def test_kospi_all_sources_fail_records_every_reason(tmp_path: Path, monkeypatch):
+    _write_spy_csv(tmp_path)
+    import rl.benchmarks as bm
+
+    def boom(tickers, start, end):
+        raise BenchmarkDownloadError("ImpersonateError chrome")
+
+    monkeypatch.setattr(bm, "_from_yfinance", boom)
+    out = load_market_benchmarks(
+        "2020-01-01", "2020-02-15", data_dir=tmp_path, allow_download=True, required=("spy",),
+    )
+    assert "kospi" not in out
+    assert len(bm.KOSPI_ATTEMPTS) == 4
+    assert not any(a["ok"] for a in bm.KOSPI_ATTEMPTS)
+    assert "ImpersonateError" in bm.KOSPI_ATTEMPTS[-1]["error"]
 
 
 def test_required_all_means_kospi_hard_fails(tmp_path: Path, monkeypatch):

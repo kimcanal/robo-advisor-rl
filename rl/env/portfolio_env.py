@@ -180,6 +180,8 @@ class PortfolioEnv(gym.Env):
             "safe_guard_triggered": terminated,
             "portfolio_risk": portfolio_risk,
             "effective_mdd_limit": self.mdd_limit,
+            # 다음 스텝에 적용될 목표 비중 (백테스트 비중 추적·대시보드용)
+            "weights": new_weights.astype(np.float32).copy(),
         }
 
         obs = self._get_obs() if not (terminated or truncated) else np.zeros_like(self.observation_space.low)

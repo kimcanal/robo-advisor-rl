@@ -50,14 +50,15 @@ def test_optimize_mvo_smoke():
     assert abs(sum(body["weights"].values()) - 1.0) < 1e-4
 
 
-def test_explain_stub():
+def test_explain_unavailable_returns_no_fake_values(tmp_path, monkeypatch):
+    monkeypatch.setenv("DRL_ARTIFACT_DIR", str(tmp_path))
     r = client.post("/explain", json={"tickers": ["SPY", "QQQ"], "asset_index": 0, "top_k": 3})
     assert r.status_code == 200
     body = r.json()
     assert body["stub"] is True
     assert body["asset"] == "SPY"
-    assert len(body["top_features"]) == 3
-    assert body["mode"] in {"stub_pseudo_shap", "shap_kernel_attempted"}
+    assert body["top_features"] == []
+    assert body["mode"] == "unavailable"
     assert body.get("latency_ms") is not None
     assert isinstance(body.get("summary"), str) and body["summary"]
     for feat in body["top_features"]:
@@ -79,6 +80,7 @@ def test_explain_artifact_json(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     monkeypatch.setenv("EXPLAIN_ARTIFACT_PATH", str(artifact))
+    monkeypatch.setenv("DRL_ARTIFACT_DIR", str(tmp_path / "no_drl"))
     r = client.post("/explain", json={"tickers": ["SPY", "QQQ"], "asset_index": 0, "top_k": 2})
     assert r.status_code == 200
     body = r.json()
@@ -139,7 +141,10 @@ def test_health_version_patch():
 
 
 def test_backtest_get():
-    r = client.get("/backtest", params={"n_days": 60, "seed": 1, "benchmarks": "spy,kospi"})
+    r = client.get(
+        "/backtest",
+        params={"n_days": 60, "seed": 1, "benchmarks": "spy,kospi", "source": "synthetic"},
+    )
     assert r.status_code == 200
     body = r.json()
     assert body["n_days"] == 60

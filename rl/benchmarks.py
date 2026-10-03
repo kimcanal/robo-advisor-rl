@@ -1,8 +1,13 @@
 """시장 벤치마크(S&P500 / KOSPI) 로더 — Walk-Forward·백테스트 12지표 비교용.
 
 우선순위:
-  1) 로컬 CSV `rl/data/raw/{SPY|GSPC|KS11|EWY}.csv` (Date + Close/Adj Close)
-  2) yfinance 다운로드 (SPY/^GSPC, KOSPI는 ^KS11 → KS11 → EWY 순)
+  1) 로컬 CSV `rl/data/raw/{SPY|GSPC|KS11|KOSPI}.csv` (Date + Close/Adj Close)
+  2) spy: yfinance (SPY/^GSPC)
+     kospi: pykrx(지수 1001, KRX_ID/KRX_PW 필요) → FinanceDataReader(KS11)
+            → 공공데이터포털 지수시세(DATA_GO_KR_SERVICE_KEY 필요) → yfinance(^KS11)
+  EWY(MSCI Korea ETF)는 KOSPI가 아니므로 KOSPI 폴백에서 제외했다.
+  모든 KOSPI 시도와 실패 원인은 `KOSPI_ATTEMPTS`에 남아 walk_forward가
+  `benchmark_status.json`으로 저장한다 (리포트에 실패를 그대로 쓰기 위함).
 
 필수 벤치마크(기본: spy) 실패 시 BenchmarkDownloadError.
 선택 벤치마크(기본: kospi)는 yfinance ImpersonateError·빈 다운로드 등에서
@@ -20,7 +25,7 @@ RAW_DIR = Path(__file__).parent / "data" / "raw"
 
 # 논리 이름 → (로컬 파일 stem 후보, yfinance 티커 후보)
 # kospi: ^KS11이 Colab/curl_cffi에서 ImpersonateError·empty로 자주 깨지므로
-# KS11(동일 심볼 변형) → EWY(MSCI Korea ETF) 순으로 폴백.
+# 원격 소스는 _load_kospi_remote 참고 (EWY 프록시는 사용하지 않음).
 BENCHMARK_SPECS: dict[str, dict] = {
     "spy": {
         "label": "S&P500 (SPY)",
@@ -28,9 +33,9 @@ BENCHMARK_SPECS: dict[str, dict] = {
         "yf_tickers": ("SPY", "^GSPC"),
     },
     "kospi": {
-        "label": "KOSPI (^KS11 / EWY)",
-        "local_stems": ("KS11", "^KS11", "KOSPI", "EWY"),
-        "yf_tickers": ("^KS11", "KS11", "EWY"),
+        "label": "KOSPI (pykrx 1001 / FDR KS11 / data.go.kr / ^KS11)",
+        "local_stems": ("KS11", "^KS11", "KOSPI"),
+        "yf_tickers": ("^KS11",),
     },
 }
 
@@ -90,6 +95,97 @@ def _from_yfinance(tickers: tuple[str, ...], start: str, end: str) -> pd.Series:
     )
 
 
+# 마지막 KOSPI 로드 시도 기록: [{"source", "ok", "rows" | "error"}]
+KOSPI_ATTEMPTS: list[dict] = []
+
+
+def _kospi_pykrx(start: str, end: str) -> pd.Series:
+    import os
+
+    from pykrx import stock  # optional dependency
+
+    if not (os.getenv("KRX_ID") and os.getenv("KRX_PW")):
+        raise RuntimeError("pykrx>=1.2 needs KRX_ID/KRX_PW (KRX data portal login)")
+    df = stock.get_index_ohlcv_by_date(start.replace("-", ""), end.replace("-", ""), "1001")
+    if df is None or df.empty or "종가" not in df.columns:
+        raise RuntimeError("pykrx returned empty frame")
+    s = df["종가"].astype(float)
+    s.index = pd.to_datetime(s.index)
+    return s.rename("KOSPI")
+
+
+def _kospi_fdr(start: str, end: str) -> pd.Series:
+    import FinanceDataReader as fdr  # optional dependency
+
+    df = fdr.DataReader("KS11", start, end)
+    if df is None or df.empty or "Close" not in df.columns:
+        raise RuntimeError("FinanceDataReader returned empty frame")
+    return df["Close"].astype(float).rename("KOSPI")
+
+
+def _kospi_data_go_kr(start: str, end: str) -> pd.Series:
+    """금융위원회_지수시세정보 (apis.data.go.kr). 서비스키는 .env의 DATA_GO_KR_SERVICE_KEY."""
+    import json as _json
+    import os
+    import urllib.parse
+    import urllib.request
+
+    key = os.getenv("DATA_GO_KR_SERVICE_KEY")
+    if not key:
+        raise RuntimeError("DATA_GO_KR_SERVICE_KEY not set")
+    base = "https://apis.data.go.kr/1160100/service/GetMarketIndexInfoService/getStockMarketIndex"
+    rows: list[dict] = []
+    page = 1
+    while True:
+        q = urllib.parse.urlencode(
+            {
+                "serviceKey": key, "resultType": "json", "idxNm": "코스피",
+                "beginBasDt": start.replace("-", ""), "endBasDt": end.replace("-", ""),
+                "numOfRows": 1000, "pageNo": page,
+            }
+        )
+        with urllib.request.urlopen(f"{base}?{q}", timeout=20) as r:
+            payload = _json.loads(r.read().decode("utf-8"))
+        body = payload.get("response", {}).get("body")
+        if body is None:
+            raise RuntimeError(f"unexpected response: {str(payload)[:200]}")
+        items = (body.get("items") or {}).get("item") or []
+        if isinstance(items, dict):
+            items = [items]
+        rows.extend(items)
+        if not items or len(rows) >= int(body.get("totalCount", 0)):
+            break
+        page += 1
+    if not rows:
+        raise RuntimeError("data.go.kr returned 0 rows")
+    df = pd.DataFrame(rows)
+    s = pd.Series(df["clpr"].astype(float).to_numpy(), index=pd.to_datetime(df["basDt"], format="%Y%m%d"))
+    return s.sort_index().rename("KOSPI")
+
+
+def _load_kospi_remote(start: str, end: str) -> pd.Series:
+    KOSPI_ATTEMPTS.clear()
+    sources = (
+        ("pykrx", _kospi_pykrx),
+        ("FinanceDataReader", _kospi_fdr),
+        ("data.go.kr", _kospi_data_go_kr),
+        ("yfinance ^KS11", lambda a, b: _from_yfinance(("^KS11",), a, b)),
+    )
+    for name, fn in sources:
+        try:
+            s = fn(start, end).dropna()
+            if s.empty:
+                raise RuntimeError("empty after dropna")
+            KOSPI_ATTEMPTS.append({"source": name, "ok": True, "rows": int(len(s))})
+            return s
+        except Exception as e:  # noqa: BLE001 — every failure is recorded
+            KOSPI_ATTEMPTS.append({"source": name, "ok": False, "error": f"{type(e).__name__}: {e}"[:300]})
+    raise BenchmarkDownloadError(
+        "KOSPI 모든 소스 실패: "
+        + "; ".join(f"{a['source']}: {a.get('error')}" for a in KOSPI_ATTEMPTS)
+    )
+
+
 def load_benchmark_prices(
     name: str,
     start: str,
@@ -122,14 +218,17 @@ def load_benchmark_prices(
         )
 
     try:
-        remote = _from_yfinance(spec["yf_tickers"], start=start, end=end)
+        if key == "kospi":
+            remote = _load_kospi_remote(start, end)
+        else:
+            remote = _from_yfinance(spec["yf_tickers"], start=start, end=end)
         return remote.loc[start:end].dropna()
     except BenchmarkDownloadError:
         raise
     except Exception as e:
         raise BenchmarkDownloadError(
             f"[{spec['label']}] 다운로드 실패: {e}. "
-            f"폴백: `{data_dir}/{{SPY|KS11|EWY}}.csv`에 Date, Close 컬럼 CSV를 두세요."
+            f"폴백: `{data_dir}/{{SPY|KS11}}.csv`에 Date, Close 컬럼 CSV를 두세요."
         ) from e
 
 

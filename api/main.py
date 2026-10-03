@@ -1,11 +1,18 @@
-"""FastAPI entrypoint — /health /optimize /explain /research /risk-tags/apply /backtest /anova."""
+"""FastAPI entrypoint.
+
+Spec endpoints: /health /optimize /explain /research /backtest
+Extra (dashboard, read-only): /anova/results /training/curves /portfolio/history /artifacts/file
+Demos: /anova (synthetic) /risk-tags/apply (stub)
+"""
 from __future__ import annotations
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse
 
 from api import __version__
 from api.schemas import (
     AnovaRequest,
+    ArtifactPayload,
     AnovaResponse,
     BacktestResponse,
     ExplainRequest,
@@ -19,16 +26,18 @@ from api.schemas import (
     RiskTagsApplyResponse,
 )
 from api.services.anova_svc import run_anova
+from api.services.artifacts import artifact_status, safe_file
 from api.services.backtest_svc import run_backtest
 from api.services.explain import run_explain
 from api.services.optimize import run_optimize
 from api.services.research import run_research
+from api.services.results import anova_results, portfolio_history, training_curves
 from api.services.risk_apply import run_risk_tags_apply
 
 OPENAPI_TAGS = [
     {"name": "ops", "description": "Liveness / grader smoke (health, educational disclaimer)."},
-    {"name": "portfolio", "description": "Portfolio weight helpers (equal / MVO educational demos)."},
-    {"name": "xai", "description": "Explainability stubs (SHAP artifact JSON or pseudo-SHAP)."},
+    {"name": "portfolio", "description": "Portfolio weights: trained PPO policy (drl), MVO, 1/N; test-year history."},
+    {"name": "xai", "description": "SHAP of the trained policy (computed offline, served here)."},
     {
         "name": "research",
         "description": (
@@ -36,7 +45,7 @@ OPENAPI_TAGS = [
             "and risk-tag → PortfolioEnv.portfolio_risk wiring. Always stub: true; no live LLM."
         ),
     },
-    {"name": "eval", "description": "Synthetic backtest metrics and educational ANOVA demos."},
+    {"name": "eval", "description": "Walk-forward 12 metrics, ANOVA results, learning / lambda curves."},
 ]
 
 # Canonical public paths (also returned by GET /health for graders).
@@ -48,6 +57,10 @@ PUBLIC_ENDPOINTS = [
     "/backtest",
     "/anova",
     "/risk-tags/apply",
+    "/anova/results",
+    "/training/curves",
+    "/portfolio/history",
+    "/artifacts/file",
 ]
 
 app = FastAPI(
@@ -77,6 +90,7 @@ def health() -> HealthResponse:
             "Educational demo only — not investment advice; backtests ≠ future returns."
         ),
         endpoints=list(PUBLIC_ENDPOINTS),
+        models=artifact_status(),
     )
 
 
@@ -102,7 +116,11 @@ def backtest(
     include_benchmark: bool = Query(default=True),
     benchmarks: str = Query(
         default="spy,kospi",
-        description="Comma-separated logical benchmarks (synthetic if no CSV).",
+        description="synthetic source only: comma-separated synthetic benchmark names.",
+    ),
+    source: str = Query(
+        default="auto",
+        description="auto | walk_forward (committed WF results) | synthetic (smoke only)",
     ),
 ) -> BacktestResponse:
     names = [b.strip() for b in benchmarks.split(",") if b.strip()] or ["spy", "kospi"]
@@ -111,7 +129,35 @@ def backtest(
         seed=seed,
         include_benchmark=include_benchmark,
         benchmarks=names,
+        source=source,
     )
+
+
+@app.get("/anova/results", response_model=ArtifactPayload, tags=["eval"],
+         summary="ANOVA validations 1-3 computed from walk-forward results")
+def get_anova_results() -> ArtifactPayload:
+    return anova_results()
+
+
+@app.get("/training/curves", response_model=ArtifactPayload, tags=["eval"],
+         summary="PPO learning curves (Monitor) and mdd_penalty lambda sweep")
+def get_training_curves() -> ArtifactPayload:
+    return training_curves()
+
+
+@app.get("/portfolio/history", response_model=ArtifactPayload, tags=["portfolio"],
+         summary="Serving policy test-year path: cumulative, drawdown, weights, VaR/CVaR, Safe-Guard")
+def get_portfolio_history() -> ArtifactPayload:
+    return portfolio_history()
+
+
+@app.get("/artifacts/file", tags=["eval"], summary="Serve a PNG/CSV/JSON artifact (read-only)")
+def get_artifact_file(root: str = Query(..., description="drl | results"),
+                      path: str = Query(..., description="relative path, e.g. shap/shap_summary.png")):
+    p = safe_file(root, path)
+    if p is None:
+        raise HTTPException(404, f"artifact not found: {root}/{path}")
+    return FileResponse(p)
 
 
 @app.post(

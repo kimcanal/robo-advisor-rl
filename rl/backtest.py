@@ -76,6 +76,36 @@ def compute_metrics(returns: pd.Series, benchmark: pd.Series | None = None, risk
     }
 
 
+def extend_after_safeguard(
+    rets: np.ndarray | list[float],
+    n_total: int,
+    fee_rate: float,
+    risk_free: float = 0.0,
+) -> tuple[np.ndarray, int | None]:
+    """Safe-Guard로 끊긴 테스트 롤아웃을 테스트 구간 끝까지 현금으로 채운다.
+
+    이전 Walk-Forward는 MDD>15%로 에피소드가 끝나면 그 짧은 시계열을 1년
+    성과로 채점했다(동일가중·MVO·SPY는 1년 전체). 그래서 2020년 초 테스트는
+    DRL만 코로나 바닥(35거래일)에서 성적이 확정됐다.
+
+    여기서는 Safe-Guard 발동을 "전량 청산 후 현금 보유"로 해석한다:
+      - 발동 다음 날: 전량 매도 비용 1회(one-way turnover = 1.0) 차감
+      - 이후: 무위험수익률(연율 risk_free → 일별 로그수익률)로 채움
+    재진입은 하지 않는다(보수적 가정, 리포트에 명시).
+
+    반환: (길이 n_total 시계열, 발동 인덱스 또는 None)
+    """
+    rets = np.asarray(rets, dtype=float)
+    if len(rets) >= n_total:
+        return rets[:n_total], None
+    trigger_idx = len(rets) - 1
+    n_pad = n_total - len(rets)
+    daily_rf = float(np.log1p(risk_free) / TRADING_DAYS) if risk_free > -1 else 0.0
+    pad = np.full(n_pad, daily_rf)
+    pad[0] -= fee_rate
+    return np.concatenate([rets, pad]), trigger_idx
+
+
 def walk_forward_windows(
     dates: pd.DatetimeIndex,
     train_years: int = 4,

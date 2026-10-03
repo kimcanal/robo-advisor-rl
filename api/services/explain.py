@@ -1,7 +1,12 @@
-"""Decision explanation — SHAP artifact path if present, else clear stub.
+"""Decision explanation.
 
-Avoid importing rl.shap_explain at module load (it pulls shap/matplotlib).
-Feature-name layout mirrors PortfolioEnv observation order.
+Order:
+  1) Main-model SHAP (artifacts/drl/shap/shap_result.json from rl.shap_main) — real values
+  2) Legacy precomputed JSON (rl/outputs/shap/*.json or EXPLAIN_ARTIFACT_PATH)
+  3) Unavailable: no contributions are returned (no pseudo / random values)
+
+KernelExplainer is far too slow for a synchronous request, so SHAP is computed
+offline and this endpoint only serves it (latency well under the 5 s budget).
 """
 from __future__ import annotations
 
@@ -10,49 +15,73 @@ import os
 import time
 from pathlib import Path
 
-import numpy as np
-
 from api.schemas import ExplainRequest, ExplainResponse, FeatureContribution
+from api.services.artifacts import drl_dir, read_json
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_MODELS_DIR = REPO_ROOT / "rl" / "outputs" / "models"
-DEFAULT_ARTIFACT_DIR = REPO_ROOT / "rl" / "outputs" / "shap"
+LEGACY_ARTIFACT_DIR = REPO_ROOT / "rl" / "outputs" / "shap"
 
 
-def _feature_names(tickers: list[str], window: int = 30, *, include_risk: bool = True) -> list[str]:
-    names: list[str] = []
-    for k in range(window, 0, -1):
-        for t in tickers:
-            names.append(f"ret_t-{k}_{t}")
-    names += [f"weight_{t}" for t in tickers]
-    names += [f"rsi_{t}" for t in tickers]
-    names += [f"macd_{t}" for t in tickers]
-    if include_risk:
-        names.append("portfolio_risk")
-    return names
+def _ms(t0: float) -> float:
+    return round((time.perf_counter() - t0) * 1000.0, 3)
 
 
-def _resolve_artifact_path(req: ExplainRequest) -> Path | None:
+def _main_model(req: ExplainRequest, t0: float) -> ExplainResponse | None:
+    res = read_json(drl_dir() / "shap" / "shap_result.json")
+    if not res or not res.get("decisions"):
+        return None
+    decisions = res["decisions"]
+    pick = None
+    if req.decision:
+        pick = next((d for d in decisions if d["label"] == req.decision), None)
+    if pick is None:
+        pick = decisions[0]
+    contribs = pick["contributions"][: req.top_k]
+    plots = {"summary": f"/artifacts/file?root=drl&path=shap/{res['summary']['plot']}"}
+    for d in decisions:
+        plots[f"force_{d['label']}"] = f"/artifacts/file?root=drl&path=shap/{d['force_plot']}"
+    return ExplainResponse(
+        asset=pick["asset"],
+        asset_index=int(pick["asset_index"]),
+        top_features=[
+            FeatureContribution(feature=c["feature"], contribution=round(float(c["shap"]), 6))
+            for c in contribs
+        ],
+        summary=(
+            f"SHAP for the {pick['asset']} weight decided as of {pick['as_of']} ({pick['label']}), "
+            f"model {res['run_tag']} (reward={res['reward_type']}, test {res['test'][0]}~{res['test'][1]}). "
+            f"base={pick['base_value']:.4f}, weight={pick['prediction']:.4f}. "
+            f"{res['method']}. {res.get('note', '')}"
+        ),
+        stub=False,
+        mode="main_model_shap",
+        as_of=pick["as_of"],
+        base_value=float(pick["base_value"]),
+        prediction=float(pick["prediction"]),
+        run_tag=res["run_tag"],
+        plots=plots,
+        decisions=[d["label"] for d in decisions],
+        global_importance=res["summary"]["mean_abs_shap"][: max(req.top_k, 10)],
+        latency_ms=_ms(t0),
+    )
+
+
+def _legacy_artifact(req: ExplainRequest) -> Path | None:
     candidates: list[Path] = []
     if req.artifact_path:
         candidates.append(Path(req.artifact_path))
-    env_path = os.getenv("EXPLAIN_ARTIFACT_PATH")
-    if env_path:
-        candidates.append(Path(env_path))
-    if DEFAULT_ARTIFACT_DIR.is_dir():
-        candidates.extend(sorted(DEFAULT_ARTIFACT_DIR.glob("*.json")))
-    for p in candidates:
-        if p.is_file():
-            return p
-    return None
+    if os.getenv("EXPLAIN_ARTIFACT_PATH"):
+        candidates.append(Path(os.environ["EXPLAIN_ARTIFACT_PATH"]))
+    if LEGACY_ARTIFACT_DIR.is_dir():
+        candidates.extend(sorted(LEGACY_ARTIFACT_DIR.glob("*.json")))
+    return next((p for p in candidates if p.is_file()), None)
 
 
-def _load_artifact(path: Path, asset: str, top_k: int) -> list[FeatureContribution] | None:
+def _load_legacy(path: Path, asset: str, top_k: int) -> list[FeatureContribution] | None:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    # Accept {"features":[{"feature","contribution"}, ...]} or per-asset map
     rows = None
     if isinstance(data, dict):
         if asset in data and isinstance(data[asset], list):
@@ -63,10 +92,8 @@ def _load_artifact(path: Path, asset: str, top_k: int) -> list[FeatureContributi
             rows = data["top_features"]
     elif isinstance(data, list):
         rows = data
-    if not rows:
-        return None
-    out: list[FeatureContribution] = []
-    for row in rows[:top_k]:
+    out = []
+    for row in (rows or [])[:top_k]:
         if not isinstance(row, dict):
             continue
         feat = row.get("feature") or row.get("name")
@@ -77,83 +104,30 @@ def _load_artifact(path: Path, asset: str, top_k: int) -> list[FeatureContributi
     return out or None
 
 
-def _model_zip_exists(req: ExplainRequest) -> Path | None:
-    if req.model_path:
-        p = Path(req.model_path)
-        if p.is_file():
-            return p
-    env_path = os.getenv("EXPLAIN_MODEL_PATH")
-    if env_path and Path(env_path).is_file():
-        return Path(env_path)
-    if DEFAULT_MODELS_DIR.is_dir():
-        zips = sorted(DEFAULT_MODELS_DIR.glob("*.zip"))
-        if zips:
-            return zips[0]
-    return None
-
-
 def run_explain(req: ExplainRequest) -> ExplainResponse:
     t0 = time.perf_counter()
+    main = _main_model(req, t0)
+    if main is not None:
+        return main
+
     tickers = list(req.tickers) or ["SPY"]
     idx = min(req.asset_index, len(tickers) - 1)
     asset = tickers[idx]
-
-    # 1) Prefer precomputed SHAP JSON artifacts (CI-friendly, no SB3 load).
-    artifact = _resolve_artifact_path(req)
-    if artifact is not None:
-        loaded = _load_artifact(artifact, asset, req.top_k)
+    path = _legacy_artifact(req)
+    if path is not None:
+        loaded = _load_legacy(path, asset, req.top_k)
         if loaded:
-            latency_ms = round((time.perf_counter() - t0) * 1000.0, 3)
             return ExplainResponse(
-                asset=asset,
-                asset_index=idx,
-                top_features=loaded,
-                summary=(
-                    f"Loaded precomputed SHAP contributions for {asset} from "
-                    f"{artifact}. Replace artifact or drop file to fall back to stub."
-                ),
-                stub=False,
-                mode="artifact_json",
-                latency_ms=latency_ms,
+                asset=asset, asset_index=idx, top_features=loaded, stub=False,
+                mode="artifact_json", latency_ms=_ms(t0),
+                summary=f"Loaded precomputed SHAP contributions for {asset} from {path}.",
             )
-
-    # 2) Model zip present → note that KernelExplainer path is available but
-    #    not executed in the API (too slow / heavy for request path). Clear stub.
-    model_zip = _model_zip_exists(req)
-    names = _feature_names(tickers, window=30, include_risk=True)
-    rng = np.random.default_rng(abs(hash(asset)) % (2**32))
-    scores = rng.normal(0, 1, size=len(names))
-    order = np.argsort(-np.abs(scores))[: req.top_k]
-    top = [
-        FeatureContribution(feature=names[i], contribution=round(float(scores[i]), 4))
-        for i in order
-    ]
-
-    if model_zip is not None:
-        mode = "shap_kernel_attempted"
-        summary = (
-            f"Found SB3 zip at {model_zip} but API uses a lightweight pseudo-SHAP "
-            f"ranking for {asset} (index {idx}) — KernelExplainer is too slow for "
-            "sync HTTP. Run rl.shap_explain.explain_decision offline and drop JSON "
-            f"under {DEFAULT_ARTIFACT_DIR}/ or set EXPLAIN_ARTIFACT_PATH."
-        )
-        stub = True
-    else:
-        mode = "stub_pseudo_shap"
-        summary = (
-            f"Stub explanation for {asset} weight (index {idx}). No model zip under "
-            f"{DEFAULT_MODELS_DIR} and no SHAP JSON under {DEFAULT_ARTIFACT_DIR}. "
-            "Wire offline rl.shap_explain output or set EXPLAIN_ARTIFACT_PATH."
-        )
-        stub = True
-
-    latency_ms = round((time.perf_counter() - t0) * 1000.0, 3)
     return ExplainResponse(
-        asset=asset,
-        asset_index=idx,
-        top_features=top,
-        summary=summary,
-        stub=stub,
-        mode=mode,
-        latency_ms=latency_ms,
+        asset=asset, asset_index=idx, top_features=[], stub=True, mode="unavailable",
+        latency_ms=_ms(t0),
+        summary=(
+            "No SHAP for the trained policy yet: artifacts/drl/shap/shap_result.json is missing. "
+            "Run `python -m rl.shap_main` after exporting the serving models (Colab cell 7). "
+            "No contribution values are returned rather than placeholders."
+        ),
     )

@@ -37,12 +37,17 @@ def make_eval_vecnorm(env_fn, train_vecnorm: VecNormalize) -> VecNormalize:
     return eval_venv
 
 
-def rollout_vecnorm(model, eval_venv: VecNormalize):
+def rollout_vecnorm(model, eval_venv: VecNormalize, return_infos: bool = False):
     """VecNormalize로 감싼 평가 환경에서 1 에피소드를 deterministic하게
-    굴리고, (실제 net_return 배열, 정규화된 관측값 배열)을 반환한다."""
+    굴리고, (실제 net_return 배열, 정규화된 관측값 배열)을 반환한다.
+
+    return_infos=True면 스텝별 info dict 리스트(비중·낙폭·Safe-Guard 플래그)도
+    세 번째 값으로 돌려준다. 기존 호출부는 2-튜플 그대로 동작한다.
+    """
     obs = eval_venv.reset()
     returns = []
     obs_history = []
+    infos_out = []
     done = False
     while not done:
         obs_history.append(obs[0].copy())
@@ -50,4 +55,7 @@ def rollout_vecnorm(model, eval_venv: VecNormalize):
         obs, _reward, dones, infos = eval_venv.step(action)
         done = bool(dones[0])
         returns.append(infos[0]["net_return"])
+        infos_out.append(dict(infos[0]))
+    if return_infos:
+        return np.array(returns), np.array(obs_history), infos_out
     return np.array(returns), np.array(obs_history)
