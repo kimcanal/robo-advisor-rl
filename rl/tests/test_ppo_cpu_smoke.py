@@ -45,7 +45,7 @@ def test_ppo_learn_starts_on_cpu():
         batch_size=32,
         n_epochs=1,
     )
-    # device="cpu" must not consult CUDA (that probe is the Colab SIGSEGV).
+    # device="cpu" must not consult CUDA; Colab also needs `pip uninstall triton` (torch/_dynamo SIGSEGV).
     assert model.device.type == "cpu"
     model.learn(total_timesteps=32)
     assert model.num_timesteps >= 32
