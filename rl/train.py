@@ -57,7 +57,7 @@ def train(
     monitored_env_fn = lambda: Monitor(env_fn(), filename=str(monitor_path))
     train_venv = make_train_vecnorm(monitored_env_fn)
 
-    model = PPO("MlpPolicy", train_venv, verbose=1, seed=seed)
+    model = PPO("MlpPolicy", train_venv, verbose=1, seed=seed, device="cpu")
     model.learn(total_timesteps=timesteps)
 
     model_path = OUT_DIR / "models" / f"ppo_{reward_type}.zip"
